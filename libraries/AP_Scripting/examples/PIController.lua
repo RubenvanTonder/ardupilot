@@ -6,12 +6,13 @@
 
 
 
-UPDATE_RATE_HZ = 1
+UPDATE_RATE_HZ = 10
 
 -- select the servo powering the rudder
 local servo_function = Parameter()
 local servo_func = servo_function:init("SERVO1_FUNCTION")
 local ground_steer = 26
+local servo_number = 3
 
 -- setup a parameter block
 local PARAM_TABLE_KEY = 73
@@ -38,13 +39,19 @@ function bind_add_param(name, idx, default_value)
     assert(param:add_param(PARAM_TABLE_KEY, idx, name, default_value), string.format('could not add param %s', name))
     return bind_param(PARAM_TABLE_PREFIX .. name)
 end
-gcs:send_text(MAV_SEVERITY_INFO,"Loaded gen_control3.lua")
-STRCTL_ENABLE = bind_add_param('ENABLE', 1, 1)
-if STRCTL_ENABLE:get() <= 0 then
-   return
+
+-- constrain a value between limits
+local function constrain(v, vmin, vmax)
+   if v < vmin then
+      v = vmin
+   end
+   if v > vmax then
+      v = vmax
+   end
+   return v
 end
 
-gcs:send_text(MAV_SEVERITY_INFO,"Loaded gen_control2.lua")
+
 
 -- MIN, MAX and IDLE PWM for throttle output
 STRCTL_PWM_MIN = bind_add_param('PWM_MIN', 2, 1000)
@@ -72,10 +79,6 @@ STRCTL_VOLT_TARG = bind_add_param('HDG_TARG', 11, 0)
 
 -- maximum slew rate in percent/second for throttle change
 STRCTL_SLEW_RATE = bind_add_param('SLEW_RATE', 12, 100)
-
-
-
-gcs:send_text(MAV_SEVERITY_INFO,"Loaded gen_control3.lua")
 
 -- a PI controller implemented as a Lua object
 local function PI_controller(kP,kI,iMax,min,max)
@@ -108,12 +111,12 @@ local function PI_controller(kP,kI,iMax,min,max)
        local err = target - current
        _counter = _counter + 1
  
-       local P = _kP:get() * err
+       local P = _kP * err
        if ((_total < _max and _total > _min) or (_total >= _max and err < 0) or (_total <= _min and err > 0)) then
-          _I = _I + _kI:get() * err * dt
+          _I = _I + _kI * err * dt
        end
-       if _iMax:get() > 0 then
-          _I = constrain(_I, -_iMax:get(), iMax:get())
+       if _iMax > 0 then
+          _I = constrain(_I, -_iMax, iMax)
        end
        local I = _I
        local ret = P + I
@@ -140,38 +143,39 @@ local function PI_controller(kP,kI,iMax,min,max)
     return self
  end
  
- local str_PI = PI_controller(GENCTL_PID_P, GENCTL_PID_I, GENCTL_PID_IMAX, 0, 1)
+ local str_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), 0, 1)
  local last_pwm = STRCTL_PWM_MIN:get()
  -- Find the desired heading angle
- local desired_heading = math.pi
+ local desired_heading = 0
  local rudder_out = 0
  
- function update()
-   gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: start " .. last_pwm)
-    if arming:is_armed() and vehicle:get_mode() == rover_guided_mode_num then
-          gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
-          STRCTL_ENABLE = 1
-    end
-    gcs:send_text(MAV_SEVERITY_INFO,"Enable: " .. STRCTL_ENABLE:get())
-    if STRCTL_ENABLE:get() == 1 then
-      gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: finish ")
+function update()
+
+   if arming:is_armed() and vehicle:get_mode() == rover_guided_mode_num then
+      gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
+      STRCTL_ENABLE = 1
+   end
+
+   if STRCTL_ENABLE == 1 then
       -- Find the actual heading angle
       -- Find the difference and feed it into controller
       rudder_out = str_PI.update(desired_heading, ahrs:get_yaw())
       rudder_out = constrain(rudder_out, 0, 1)
       
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
-      gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: finish " .. rudder_pwm)
-      thr_PI.log("STRC")
-    end
-    local max_change = STRCTL_SLEW_RATE:get() * (STRCTL_PWM_MAX:get() - STRCTL_PWM_MIN:get()) * 0.01 / UPDATE_RATE_HZ
+      str_PI.log("STRC")
    
-    rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
-    last_pwm = rudder_pwm
-    if STRCTL_THR_CHAN:get() > 0 then
-       SRV_Channels:set_output_pwm_chan(servo_func, math.floor(rudder_pwm))
-    end
- end
+      local max_change = STRCTL_SLEW_RATE:get() * (STRCTL_PWM_MAX:get() - STRCTL_PWM_MIN:get()) * 0.01 / UPDATE_RATE_HZ
+   
+      rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
+      last_pwm = rudder_pwm
+      if STRCTL_THR_CHAN:get() > 0 then
+         gcs:send_text(MAV_SEVERITY_INFO,"Servo Output")
+         --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
+         SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
+      end
+   end
+end
  
  
  -- wrapper around update(). This calls update() at 10Hz,
