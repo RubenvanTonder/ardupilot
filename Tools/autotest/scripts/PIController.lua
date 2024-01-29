@@ -59,8 +59,8 @@ STRCTL_PWM_MAX = bind_add_param('PWM_MAX', 3, 2000)
 STRCTL_PWM_IDLE = bind_add_param('PWM_IDLE', 4, 1500)
 
 -- P and I gains for controller
-STRCTL_PID_P = bind_add_param('PID_P', 5, 0.1)
-STRCTL_PID_I = bind_add_param('PID_I', 6, 0.1)
+STRCTL_PID_P = bind_add_param('PID_P', 5, 1)
+STRCTL_PID_I = bind_add_param('PID_I', 6, 0.3)
 
 -- maximum I contribution
 STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 1.0)
@@ -143,24 +143,26 @@ local function PI_controller(kP,kI,iMax,min,max)
     return self
  end
  
- local str_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), 0, 1)
+ local str_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
  local last_pwm = STRCTL_PWM_MIN:get()
  -- Find the desired heading angle
  local desired_heading = 0
  local rudder_out = 0
+ local STRCTL_ENABLE = 0
  
 function update()
 
-   if arming:is_armed() and vehicle:get_mode() == rover_guided_mode_num then
+   if arming:is_armed() and vehicle:get_mode() == rover_guided_mode_num  and STRCTL_ENABLE == 0 then
       gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
+      desired_heading = ahrs:get_yaw() + math.pi/6
    end
 
    if STRCTL_ENABLE == 1 then
       -- Find the actual heading angle
       -- Find the difference and feed it into controller
       rudder_out = str_PI.update(desired_heading, ahrs:get_yaw())
-      rudder_out = constrain(rudder_out, 0, 1)
+      rudder_out = constrain(rudder_out, -1, 1)
       
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
       str_PI.log("STRC")

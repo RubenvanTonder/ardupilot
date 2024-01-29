@@ -424,6 +424,7 @@ void Mode::navigate_to_waypoint()
     // apply speed nudge from pilot
     // calc_speed_nudge's "desired_speed" argument should be negative when vehicle is reversing
     // AR_WPNav nudge_speed_max argu,ent should always be positive even when reversing
+   // gcs().send_text(MAV_SEVERITY_INFO, "Navigate to Waypoint");
     const float calc_nudge_input_speed = g2.wp_nav.get_speed_max() * (g2.wp_nav.get_reversed() ? -1.0 : 1.0);
     const float nudge_speed_max = calc_speed_nudge(calc_nudge_input_speed, g2.wp_nav.get_reversed());
     g2.wp_nav.set_nudge_speed_max(fabsf(nudge_speed_max));
@@ -444,12 +445,14 @@ void Mode::navigate_to_waypoint()
 
     float desired_heading_cd = g2.wp_nav.oa_wp_bearing_cd();
     if (g2.sailboat.use_indirect_route(desired_heading_cd)) {
+        //gcs().send_text(MAV_SEVERITY_INFO, "Indirect Route");
         // sailboats use heading controller when tacking upwind
         desired_heading_cd = g2.sailboat.calc_heading(desired_heading_cd);
         // use pivot turn rate for tacks
         const float turn_rate = g2.sailboat.tacking() ? g2.wp_nav.get_pivot_rate() : 0.0f;
         calc_steering_to_heading(desired_heading_cd, turn_rate);
     } else {
+       // gcs().send_text(MAV_SEVERITY_INFO, "Waypoint Controller");
         // retrieve turn rate from waypoint controller
         float desired_turn_rate_rads = g2.wp_nav.get_turn_rate_rads();
 
