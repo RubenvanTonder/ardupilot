@@ -6,7 +6,7 @@
 
 
 
-UPDATE_RATE_HZ = 10
+UPDATE_RATE_HZ = 25
 
 -- select the servo powering the rudder
 local servo_function = Parameter()
@@ -51,6 +51,11 @@ local function constrain(v, vmin, vmax)
    return v
 end
 
+local function delay()
+   
+   return update, 250
+end
+
 
 
 -- MIN, MAX and IDLE PWM for throttle output
@@ -59,11 +64,11 @@ STRCTL_PWM_MAX = bind_add_param('PWM_MAX', 3, 2000)
 STRCTL_PWM_IDLE = bind_add_param('PWM_IDLE', 4, 1500)
 
 -- P and I gains for controller
-STRCTL_PID_P = bind_add_param('PID_P', 5, 1)
-STRCTL_PID_I = bind_add_param('PID_I', 6, 0.3)
+STRCTL_PID_P = bind_add_param('PID_P', 5, 1.2)
+STRCTL_PID_I = bind_add_param('PID_I', 6, 0.24)
 
 -- maximum I contribution
-STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 1.0)
+STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 0.25)
 
 -- RCn_OPTION value for 3 position switch
 STRCTL_RC_FUNC  = bind_add_param('RC_FUNC',  8, 300)
@@ -149,13 +154,26 @@ local function PI_controller(kP,kI,iMax,min,max)
  local desired_heading = 0
  local rudder_out = 0
  local STRCTL_ENABLE = 0
- 
+ local AUX_FUNCTION_NUM = 300
+ local aux_changed = false
+
 function update()
 
-   if arming:is_armed() and vehicle:get_mode() == rover_guided_mode_num  and STRCTL_ENABLE == 0 then
+   local aux_pos = rc:get_aux_cached(AUX_FUNCTION_NUM)
+   if aux_pos ~= last_aux_pos then
+      last_aux_pos = aux_pos
+      aux_changed = not(aux_changed)
+      gcs:send_text(MAV_SEVERITY_INFO, string.format("Aux set to %u", aux_pos))
+   end
+   if aux_changed and STRCTL_ENABLE == 0 then
       gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
       desired_heading = ahrs:get_yaw() + math.pi/6
+      delay()
+   end
+   if not(aux_changed)  then
+      STRCTL_ENABLE = 0
+      SRV_Channels:set_output_pwm(94,1500)
    end
 
    if STRCTL_ENABLE == 1 then
