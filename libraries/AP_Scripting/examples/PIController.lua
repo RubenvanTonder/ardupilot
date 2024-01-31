@@ -148,7 +148,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     return self
  end
  
- local str_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
+
  local last_pwm = STRCTL_PWM_MIN:get()
  -- Find the desired heading angle
  local desired_heading = 0
@@ -160,15 +160,19 @@ local function PI_controller(kP,kI,iMax,min,max)
 function update()
 
    local aux_pos = rc:get_aux_cached(AUX_FUNCTION_NUM)
-   if aux_pos ~= last_aux_pos then
-      last_aux_pos = aux_pos
+   if aux_pos ~= LAST_AUX_POS then
+      LAST_AUX_POS = aux_pos
       aux_changed = not(aux_changed)
       gcs:send_text(MAV_SEVERITY_INFO, string.format("Aux set to %u", aux_pos))
    end
+
+   -- Initialize PI Controler Values to zero
    if aux_changed and STRCTL_ENABLE == 0 then
       gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
       desired_heading = ahrs:get_yaw() + math.pi/6
+      -- Initialize PI Controller
+      STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
       delay()
    end
    if not(aux_changed)  then
@@ -179,11 +183,11 @@ function update()
    if STRCTL_ENABLE == 1 then
       -- Find the actual heading angle
       -- Find the difference and feed it into controller
-      rudder_out = str_PI.update(desired_heading, ahrs:get_yaw())
+      rudder_out = STR_PI.update(desired_heading, ahrs:get_yaw())
       rudder_out = constrain(rudder_out, -1, 1)
       
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
-      str_PI.log("STRC")
+      STR_PI.log("STRC")
    
       local max_change = STRCTL_SLEW_RATE:get() * (STRCTL_PWM_MAX:get() - STRCTL_PWM_MIN:get()) * 0.01 / UPDATE_RATE_HZ
    
