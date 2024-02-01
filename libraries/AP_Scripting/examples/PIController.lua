@@ -104,6 +104,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     local _counter = 0
     local _target = 0
     local _current = 0
+    local _yawrate = 0
  
     -- update the controller.
     function self.update(target, current)
@@ -113,6 +114,9 @@ local function PI_controller(kP,kI,iMax,min,max)
        end
        local dt = now - _last_t
        _last_t = now
+
+       local desired_yaw = target - current
+       --desired_yaw - ahrs:get_gyro().z
        local err = target - current
        _counter = _counter + 1
  
@@ -185,7 +189,9 @@ function update()
       -- Find the difference and feed it into controller
       rudder_out = STR_PI.update(desired_heading, ahrs:get_yaw())
       rudder_out = constrain(rudder_out, -1, 1)
-      
+      local gyro = 0
+      gyro = ahrs:get_gyro()
+      gcs:send_text(MAV_SEVERITY_INFO,"Yaw rate: ".. gyro:z())
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
       STR_PI.log("STRC")
    
