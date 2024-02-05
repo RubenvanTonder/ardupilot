@@ -21,6 +21,20 @@ end
 port:begin(9600)
 port:set_flow_control(0)
 
+-- the table key must be used by only one script on a particular flight
+-- controller. If you want to re-use it then you need to wipe your old parameters
+-- the key must be a number between 0 and 200. The key is persistent in storage
+local PARAM_TABLE_KEY = 72
+
+-- add a new parameter table for wind sensor
+assert(param:add_table(PARAM_TABLE_KEY, "MY_", 1), 'could not add param table')
+
+-- 
+assert(param:add_param(PARAM_TABLE_KEY, 1, 'WIND_SENSOR', 10), 'could not add wind sensor')
+
+local param1 = Parameter("MY_WIND_SENSOR")
+gcs:send_text(0, string.format("param1=%f", param1:get()))
+
 -- function to decode data on uart
 function decode()
     local byte = port:read()
@@ -56,14 +70,18 @@ function decode()
     if byte == 57 then
         value_read  = 9;
     end
-    if update_param then
+    if true then
         flag_D = false;
         hundreds = false;
         tens = false;
         update_param = false;
-        if not wind_parameter:set(wind_direction) then
-            gcs:send_text(6, string.format('Failed to set wind direction parameter'))
-        end
+        wind_direction = 100;
+        if not(param:set('MY_WIND_SENSOR',wind_direction)) then
+            gcs:send_text(6, 'LUA: param set failed')
+          end
+        --if not wind_parameter:set(wind_direction) then
+        --    gcs:send_text(6, string.format('Failed to set wind direction parameter'))
+        --end
         gcs:send_text(6,wind_direction)
         wind_direction = 0;
     elseif tens then 
@@ -93,7 +111,8 @@ function calibrate_receive()
     local byte = port:read()
     gcs:send_text(6,"Waiting for wind sensor")
     gcs:send_text(6,byte)
-    if byte == 49 then 
+    --if byte == 49 then 
+    if true then  
         gcs:send_text(6,"Decoding")
         return decode, 500
     end
