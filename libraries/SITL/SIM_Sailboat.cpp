@@ -40,9 +40,9 @@ namespace SITL {
 
 Sailboat::Sailboat(const char *frame_str) :
     Aircraft(frame_str),
-    steering_angle_max(35),
+    steering_angle_max(30),
     turning_circle(1.8),
-    sail_area(1.0)
+    sail_area(0.68)
 {
     motor_connected = (strcmp(frame_str, "sailboat-motor") == 0);
     lock_step_scheduled = true;
@@ -170,6 +170,11 @@ void Sailboat::update_wave(float delta_time)
     }
 }
 
+// Send message to SITL terminal for debugging 1s
+void Sailboat::send_message(char msg[], float data){
+    printf("%s %f",msg, data);
+}
+
 /*
   update the sailboat simulation by one time step
  */
@@ -198,11 +203,51 @@ void Sailboat::update(const struct sitl_input &input)
     airspeed_pitot = wind_apparent_speed;
 
     float aoa_deg = 0.0f;
+    // how much time has passed?
+    float delta_time = frame_time_us * 1.0e-6f;
+
+    
+    
+    
+
     if (sitl->sail_type.get() == 1) {
         // directly actuated wing
         float wing_angle_bf = constrain_float((input.servos[DIRECT_WING_SERVO_CH]-1500)/500.0f * 90.0f, -90.0f, 90.0f);
 
         aoa_deg = wind_apparent_dir_bf - wing_angle_bf;
+
+    } else if (sitl->sail_type.get() == 3){
+        // mainsail with sheet but controller with winch in and out of sail not anlge controller
+
+    	// servo rate of change in angle
+        float servo_rate = 10.0f;
+
+        // calculate rate from servo output 
+        float servo_rate_set = constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * servo_rate, -servo_rate, servo_rate);
+
+        // angle change due to time and servo rate
+        float servo_angle_change = servo_rate_set * delta_time;
+
+        // update current sail angle
+        current_sail_angle = constrain_float(previous_sail_angle + servo_angle_change, -60.0f, 60.0f);
+        current_sail_angle = previous_sail_angle;
+
+        char msg[] = " Current Sail Angle: ";
+        float data = current_sail_angle;
+
+        timer = timer + delta_time;
+        if (timer >= 1.0f) {
+        send_message(msg, data);
+        timer = 0.0f;
+        }
+
+        // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
+        aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - current_sail_angle, 0);
+
+        if (is_negative(wind_apparent_dir_bf)) {
+            // take into account the current tack
+            aoa_deg *= -1;
+        }
 
     } else {
         // mainsail with sheet
@@ -229,8 +274,7 @@ void Sailboat::update(const struct sitl_input &input)
     const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf));
     const float force_fwd = (lift_wf * sin_rot_rad) - (drag_wf * cos_rot_rad);
 
-    // how much time has passed?
-    float delta_time = frame_time_us * 1.0e-6f;
+    
 
     // speed in m/s in body frame
     Vector3f velocity_body = dcm.transposed() * velocity_ef_water;
