@@ -18,6 +18,10 @@ end
 
 -- Tacking and Indirect waypoint approach
 local apparent_wind_angle
+local tack_right = true
+local max_tack_distance = 10.0
+local tack_heading = math.pi/4
+local no_go_zone = math.pi/4
 
 -- current location of the sailboat
 local current_location
@@ -41,6 +45,9 @@ local waypoint_reached = 0
 local current_waypoint = 0
 local loaded = false
 local waypoint_reached = false
+
+-- Desired Heading Angle
+local desired_heading = 0.0
 
 -- Generate a Location
 local function location(mission)
@@ -78,8 +85,10 @@ end
 -- Calculate the bearing to and the length between waypoints
 local function bearing_and_length_to_waypoint(dest, src)
     local dest_src = src:get_distance_NE(dest)
-    track_heading_angle = math.atan(dest_src:y(),dest_src:x())
-    l_track = math.sqrt(dest_src:x()^2 + dest_src:y()^2)
+    local E_diff = dest_src:y()
+    local N_diff = dest_src:x()
+    track_heading_angle = math.atan(E_diff,N_diff)
+    l_track = math.sqrt(N_diff^2 + E_diff^2)
 end
 
 -- Calculate the guidance axis denoted as s and e(cross-track)
@@ -100,9 +109,6 @@ function UPDATE()
         return UPDATE, 1000
     end 
 
-   
-
-
     -- Wait for sailboat to be armed
     if arming:is_armed() then
         
@@ -111,8 +117,6 @@ function UPDATE()
             load_waypoints()
             loaded = true
         end
-
-        
 
         if (current_waypoint < waypoint.total) then
             -- Get the Current Location of the sailboat 
@@ -145,10 +149,30 @@ function UPDATE()
             -- Calculate if a tack is required
             -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
             apparent_wind_angle = math.abs(math.rad(wind_dir:get()) - track_heading_angle)
-            if apparent_wind_angle < math.pi/4 then
+            if apparent_wind_angle < no_go_zone then
                 print("Tack Required")
-                track_heading_angle = apparent_wind_angle + math.pi/4
-
+                
+                -- Perform tack right
+                if tack_right then 
+                    track_heading_angle = apparent_wind_angle + tack_heading
+                    print("Desired Heading Angle " .. track_heading_angle)
+                    print("Tack Right")
+                    -- check if crosstrack error has been reached then switch tack
+                    if guidance_axis.e > max_tack_distance then
+                        tack_right = false
+                        track_heading_angle = apparent_wind_angle - tack_heading
+                    end
+                -- Perform tack left
+                else
+                    track_heading_angle = apparent_wind_angle - tack_heading
+                    print("Desired Heading Angle " .. track_heading_angle)
+                    print("Tack Left")
+                    -- check if crosstrack error has been reached then switch tack
+                    if guidance_axis.e < -max_tack_distance then
+                        tack_right = true
+                        track_heading_angle = apparent_wind_angle + tack_heading
+                    end
+                end
 
             else
                 
