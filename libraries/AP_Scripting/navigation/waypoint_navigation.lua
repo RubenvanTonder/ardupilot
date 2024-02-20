@@ -8,6 +8,17 @@ assert(param:add_param(PARAM_TABLE_KEY, 2, 'Crosstrack', 0.0), 'could not add pa
 local table_track_heading =  Parameter("Nv_Heading")
 local table_cross_track =  Parameter("Nv_Crosstrack")
 
+-- Get the wind direction
+-- for fast param acess it is better to get a param object,
+-- this saves the code searching for the param by name every time
+local wind_dir = Parameter()
+if not wind_dir:init('SIM_WIND_DIR') then
+  gcs:send_text(6, 'get SIM_WIND_DIR failed')
+end
+
+-- Tacking and Indirect waypoint approach
+local apparent_wind_angle
+
 -- current location of the sailboat
 local current_location
 
@@ -128,18 +139,27 @@ function UPDATE()
             -- Calculate the bearing and length between source and destination waypoint
             bearing_and_length_to_waypoint(waypoint.mission[current_waypoint+1], waypoint.mission[current_waypoint])
 
-            --print(waypoint.mission[0]:lat() .. " " .. waypoint.mission[0]:lng() .. " " ..waypoint.mission[0]:alt())
-            --print("\n")
-            --print(waypoint.mission[1]:lat() .. " " .. waypoint.mission[1]:lng() .. " " .. waypoint.mission[1]:alt())
             -- Get distance along the track and cross-track error between home and waypoint 1
-
             guidance_axis_calc(current_location, waypoint.mission[current_waypoint])
+
+            -- Calculate if a tack is required
+            -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
+            apparent_wind_angle = math.abs(math.rad(wind_dir:get()) - track_heading_angle)
+            if apparent_wind_angle < math.pi/4 then
+                print("Tack Required")
+                track_heading_angle = apparent_wind_angle + math.pi/4
+
+
+            else
+                
+            end
             
             print("Track Heading " .. track_heading_angle)
             print("Track Distance " .. l_track)
             print("Track Travelled " .. guidance_axis.s)
             print("Cross-track  " .. guidance_axis.e)
-
+            
+            -- Print if global param change failed
             if not table_track_heading:set(track_heading_angle) then
                 print("Could not update track heading to table")
             end
