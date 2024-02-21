@@ -1,13 +1,8 @@
 -- Script for navigating between waypoints
 
--- Create param to mimic global variables
-local PARAM_TABLE_KEY = 74
-assert(param:add_table(PARAM_TABLE_KEY, "Nv_", 2), 'could not add param table')
-assert(param:add_param(PARAM_TABLE_KEY, 1, 'Heading', 0.0), 'could not add param1')
-assert(param:add_param(PARAM_TABLE_KEY, 2, 'Crosstrack', 0.0), 'could not add param2')
+-- Global parameters
 local table_track_heading =  Parameter("Nv_Heading")
 local table_cross_track =  Parameter("Nv_Crosstrack")
-
 -- Get the wind direction
 -- for fast param acess it is better to get a param object,
 -- this saves the code searching for the param by name every time
@@ -22,6 +17,7 @@ local tack_right = true
 local max_tack_distance = 10.0
 local tack_heading = math.pi/4
 local no_go_zone = math.pi/4
+local tacking = 0
 
 -- current location of the sailboat
 local current_location
@@ -41,7 +37,6 @@ guidance_axis.e = 0.0
 local waypoint = {}
 waypoint.total = 0
 waypoint.mission = {Location(), Location()}
-local waypoint_reached = 0
 local current_waypoint = 0
 local loaded = false
 local waypoint_reached = false
@@ -49,6 +44,7 @@ local waypoint_reached = false
 -- Desired Heading Angle
 local desired_heading = 0.0
 
+local started = false
 -- Generate a Location
 local function location(mission)
     local loc  = Location()
@@ -99,9 +95,15 @@ local function guidance_axis_calc(current, src)
     guidance_axis.e = -math.sin(track_heading_angle) * current_src:x() + math.cos(track_heading_angle) * current_src:y()
 end
 
+local function write_to_dataflash()
+    logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
+  end
 
+local function delay() 
 
-
+    return UPDATE, 500
+end
+ 
 function UPDATE()
 
     -- Wait for ahrs to initialize
@@ -111,7 +113,13 @@ function UPDATE()
 
     -- Wait for sailboat to be armed
     if arming:is_armed() then
+        if not started then
+            delay()
+            started = true
+        end
         
+        -- Log data
+        write_to_dataflash()
         -- Load in the waypoints into array
         if not loaded then
             load_waypoints()
@@ -126,8 +134,8 @@ function UPDATE()
             -- Check if waypoint has been reached
             waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[current_waypoint+1])
             if waypoint_reached then
-                print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
                 current_waypoint = current_waypoint + 1
+                print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
                 waypoint_reached = false
                 if current_waypoint == waypoint.total then
                     print("Final waypoint reached")
@@ -151,7 +159,7 @@ function UPDATE()
             apparent_wind_angle = math.abs(math.rad(wind_dir:get()) - track_heading_angle)
             if apparent_wind_angle < no_go_zone then
                 print("Tack Required")
-                
+                tacking = 1
                 -- Perform tack right
                 if tack_right then 
                     track_heading_angle = apparent_wind_angle + tack_heading
@@ -175,7 +183,8 @@ function UPDATE()
                 end
 
             else
-                
+                print("Tack not Required")
+                tacking = 0
             end
             
             print("Track Heading " .. track_heading_angle)
