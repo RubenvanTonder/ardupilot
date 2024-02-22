@@ -188,9 +188,9 @@ function UPDATE()
             end
             
             print("Track Heading " .. track_heading_angle)
-            print("Track Distance " .. l_track)
-            print("Track Travelled " .. guidance_axis.s)
-            print("Cross-track  " .. guidance_axis.e)
+            --print("Track Distance " .. l_track)
+            --print("Track Travelled " .. guidance_axis.s)
+            --print("Cross-track  " .. guidance_axis.e)
             
             -- Print if global param change failed
             if not table_track_heading:set(track_heading_angle) then
