@@ -51,6 +51,33 @@ local function constrain(v, vmin, vmax)
    return v
 end
 
+-- Flip heading from 0 - 2pi to -pi - pi
+local function flipheadingtoPi(h)
+   if h < -math.pi then
+      h = h + 2*math.pi
+   end
+   if h > math.pi then
+      h = h - 2*math.pi
+   end
+   return h
+end
+
+-- Flip heading from -pi - pi to -2pi - 2pi
+local function flipheading(h)
+   if h < -math.pi then
+      h = h + 2*math.pi
+   end
+   if h > math.pi then
+      h = h - 2*math.pi
+   end
+   return h
+end
+
+local previous_heading = 0.0
+local current_heading = 0.0
+local d_psi = 0.0
+
+
 local function delay()
    
    return update, 250
@@ -190,13 +217,26 @@ function update()
    if STRCTL_ENABLE == 1 then
       -- Find the actual heading angle
       -- Find the difference and feed it into controller
-      print(desired_heading:get())
-      rudder_out = STR_PI.update(desired_heading:get(), ahrs:get_yaw())
+      --print(desired_heading:get())
+      
+      current_heading = ahrs:get_yaw()
+      d_psi = desired_heading:get()
+
+      if math.abs(d_psi-current_heading) > math.pi then
+         if (d_psi - current_heading) < 0 then 
+            d_psi = d_psi-2*math.pi
+         else
+            d_psi = d_psi+2*math.pi
+         end
+      end
+
+      rudder_out = STR_PI.update(d_psi, ahrs:get_yaw())
+
       rudder_out = constrain(rudder_out, -1, 1)
 
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
       STR_PI.log("STRC")
-      logger.write("STRD",'DesYaw,Yaw','ff',desired_heading:get(),ahrs:get_yaw())
+      logger.write("STRD",'DesYaw,Yaw','ff',d_psi,ahrs:get_yaw())
    
       local max_change = STRCTL_SLEW_RATE:get() * (STRCTL_PWM_MAX:get() - STRCTL_PWM_MIN:get()) * 0.01 / UPDATE_RATE_HZ
    

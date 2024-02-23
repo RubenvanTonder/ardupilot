@@ -3,6 +3,9 @@
 -- Global parameters
 local table_track_heading =  Parameter("Nv_Heading")
 local table_cross_track =  Parameter("Nv_Crosstrack")
+local tack_heading = Parameter('Nv_Tack_Heading')
+local tack = Parameter('Nv_Tack')
+
 -- Get the wind direction
 -- for fast param acess it is better to get a param object,
 -- this saves the code searching for the param by name every time
@@ -90,7 +93,7 @@ end
 -- Calculate the guidance axis denoted as s and e(cross-track)
 local function guidance_axis_calc(current, src)
     local current_src = src:get_distance_NE(current)
-    print(current_src:x() .. " " .. current_src:y())
+    --print(current_src:x() .. " " .. current_src:y())
     guidance_axis.s = math.cos(track_heading_angle) * current_src:x() + math.sin(track_heading_angle) * current_src:y()
     guidance_axis.e = -math.sin(track_heading_angle) * current_src:x() + math.cos(track_heading_angle) * current_src:y()
 end
@@ -156,10 +159,12 @@ function UPDATE()
 
             -- Calculate if a tack is required
             -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
-            apparent_wind_angle = math.abs(math.rad(wind_dir:get()) - track_heading_angle)
+            apparent_wind_angle = math.abs(math.rad(wind_dir:get()) - track_heading_angle) - math.pi
+            print("Apparent Wind Angle " .. apparent_wind_angle)
             if apparent_wind_angle < no_go_zone then
                 print("Tack Required")
                 tacking = 1
+                
                 -- Perform tack right
                 if tack_right then 
                     track_heading_angle = apparent_wind_angle + tack_heading
@@ -177,6 +182,7 @@ function UPDATE()
                     print("Tack Left")
                     -- check if crosstrack error has been reached then switch tack
                     if guidance_axis.e < -max_tack_distance then
+                        print("Switch Tack")
                         tack_right = true
                         track_heading_angle = apparent_wind_angle + tack_heading
                     end
@@ -186,8 +192,9 @@ function UPDATE()
                 print("Tack not Required")
                 tacking = 0
             end
-            
-            print("Track Heading " .. track_heading_angle)
+            -- Set global tack parameter 
+            tack:set(tacking)
+            --print("Track Heading " .. track_heading_angle)
             --print("Track Distance " .. l_track)
             --print("Track Travelled " .. guidance_axis.s)
             --print("Cross-track  " .. guidance_axis.e)

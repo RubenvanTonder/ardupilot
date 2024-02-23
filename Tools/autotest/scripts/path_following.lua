@@ -10,9 +10,11 @@ UPDATE_RATE_HZ = 10
 
 -- Create param to mimic global variables
 local PARAM_TABLE_KEY1 = 74
-assert(param:add_table(PARAM_TABLE_KEY1, "Nv_", 2), 'could not add param table')
+assert(param:add_table(PARAM_TABLE_KEY1, "Nv_", 5), 'could not add param table')
 assert(param:add_param(PARAM_TABLE_KEY1, 1, 'Heading', 0.0), 'could not add param1')
 assert(param:add_param(PARAM_TABLE_KEY1, 2, 'Crosstrack', 0.0), 'could not add param2')
+assert(param:add_param(PARAM_TABLE_KEY1, 3, 'Tack_Heading', 0.0), 'could not add param3')
+assert(param:add_param(PARAM_TABLE_KEY1, 4, 'Tack', 0.0), 'could not add param3')
 
 
 -- setup a parameter block
@@ -30,7 +32,7 @@ local x_r = 0.0
 local beta = 0.0
 local vby = 0.0
 local vbx = 0.0
-local xd = 0.0
+local x_d = 0.0
 
 -- returns null if param cant be found
 local wind_dir = Parameter()
@@ -48,6 +50,7 @@ local e = Parameter()
 if not e:init('Nv_Crosstrack') then
   gcs:send_text(6, 'get Nv_Crosstrack failed')
 end
+local tack = Parameter('Nv_Tack')
 
  -- Find the desired heading angle
  local desired_heading = Parameter()
@@ -80,8 +83,8 @@ local function constrain(v, vmin, vmax)
 end
 
 -- P and I gains for controller
-local PTHCTL_PID_P = bind_add_param('PID_P', 1, 0.1)
-local PTHCTL_PID_I = bind_add_param('PID_I', 2, 0.05)
+local PTHCTL_PID_P = bind_add_param('PID_P', 1, 0.05)
+local PTHCTL_PID_I = bind_add_param('PID_I', 2, 0.01)
 
 -- maximum I contribution
 local PTHCTL_PID_IMAX = bind_add_param('PID_IMAX', 3, 0.25)
@@ -153,28 +156,34 @@ local function update()
 
    if arming:is_armed() then
 
-    -- Find the actual heading angle
-    x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
-    local x_d = x_p:get() - x_r
+    -- Find the actual heading angle 
+    -- Check if tacking is required
+    if tack:get() == 0 then
+      x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
+      x_d = x_p:get() - x_r
 
-    --LOS Vector
-    local body_to_earth = Vector3f()
-    body_to_earth = ahrs:get_velocity_NED()
-    local yaw = ahrs:get_yaw()
-    local roll = ahrs:get_roll()
-    local vex = body_to_earth:x()
-    local vey = body_to_earth:y()
+      --LOS Vector
+      local body_to_earth = Vector3f()
+      body_to_earth = ahrs:get_velocity_NED()
+      local yaw = ahrs:get_yaw()
+      local roll = ahrs:get_roll()
+      local vex = body_to_earth:x()
+      local vey = body_to_earth:y()
 
-    vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
-    vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
-    beta = math.asin(vby/vbx)
-    x_d = x_d - beta
+      vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
+      vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
+      beta = math.asin(vby/vbx)
+      x_d = x_d - beta
+    else 
+      x_d = x_p:get()
+      print("Desired Tack Heading " .. x_d)
+    end
     desired_heading:set(x_d)
 
-    print("Beta " .. beta)
-    print("Track Heading "  .. x_p:get())
-    print("Path Heading "  .. x_r)
-    print("Combined Heading "  .. x_d)
+    --print("Beta " .. beta)
+   -- print("Track Heading "  .. x_p:get())
+    --print("Path Heading "  .. x_r)
+    --print("Combined Heading "  .. x_d)
     -- Log path following controller data
     PTH_PI.log("PTHC")
     logger.write("BXY",'Beta,BodyX,BodyY','fff',beta,vbx,vby)
