@@ -217,26 +217,26 @@ function update()
    if STRCTL_ENABLE == 1 then
       -- Find the actual heading angle
       -- Find the difference and feed it into controller
-      --print(desired_heading:get())
       
+      -- issue is get_yaw() gets transform to the range of -pi - pi and I need a method to change it to follow the range correctly
       current_heading = ahrs:get_yaw()
-      d_psi = desired_heading:get()
 
-      if math.abs(d_psi-current_heading) > math.pi then
-         if (d_psi - current_heading) < 0 then 
-            d_psi = d_psi-2*math.pi
-         else
-            d_psi = d_psi+2*math.pi
-         end
+      -- Change current yaw from -pi - pi  to -2*pi - 2*pi
+      if (previous_heading - current_heading) < -math.pi then
+         current_heading = current_heading - 2 * math.pi
+      elseif (previous_heading - current_heading) > math.pi then
+         current_heading = current_heading + 2 * math.pi
       end
 
-      rudder_out = STR_PI.update(d_psi, ahrs:get_yaw())
+      previous_heading = current_heading
+
+      rudder_out = STR_PI.update(desired_heading:get(), current_heading)
 
       rudder_out = constrain(rudder_out, -1, 1)
 
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
       STR_PI.log("STRC")
-      logger.write("STRD",'DesYaw,Yaw','ff',d_psi,ahrs:get_yaw())
+      logger.write("STRD",'DesYaw,Yaw,PrevYaw','fff',desired_heading:get(),current_heading,previous_heading)
    
       local max_change = STRCTL_SLEW_RATE:get() * (STRCTL_PWM_MAX:get() - STRCTL_PWM_MIN:get()) * 0.01 / UPDATE_RATE_HZ
    

@@ -159,7 +159,7 @@ function UPDATE()
 
             -- Calculate if a tack is required
             -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
-            apparent_wind_angle = math.abs(math.rad(wind_dir:get()) - track_heading_angle) - math.pi
+            apparent_wind_angle = math.abs(-math.rad(wind_dir:get()) + track_heading_angle)
             print("Apparent Wind Angle " .. apparent_wind_angle)
             if apparent_wind_angle < no_go_zone then
                 print("Tack Required")

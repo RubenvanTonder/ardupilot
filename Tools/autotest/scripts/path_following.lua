@@ -84,7 +84,7 @@ end
 
 -- P and I gains for controller
 local PTHCTL_PID_P = bind_add_param('PID_P', 1, 0.05)
-local PTHCTL_PID_I = bind_add_param('PID_I', 2, 0.01)
+local PTHCTL_PID_I = bind_add_param('PID_I', 2, 0.005)
 
 -- maximum I contribution
 local PTHCTL_PID_IMAX = bind_add_param('PID_IMAX', 3, 0.25)
@@ -158,25 +158,25 @@ local function update()
 
     -- Find the actual heading angle 
     -- Check if tacking is required
+    --LOS Vector
+    local body_to_earth = Vector3f()
+    body_to_earth = ahrs:get_velocity_NED()
+    local yaw = ahrs:get_yaw()
+    local roll = ahrs:get_roll()
+    local vex = body_to_earth:x()
+    local vey = body_to_earth:y()
+
+    vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
+    vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
+    beta = math.asin(vby/vbx)
+
     if tack:get() == 0 then
       x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
       x_d = x_p:get() - x_r
-
-      --LOS Vector
-      local body_to_earth = Vector3f()
-      body_to_earth = ahrs:get_velocity_NED()
-      local yaw = ahrs:get_yaw()
-      local roll = ahrs:get_roll()
-      local vex = body_to_earth:x()
-      local vey = body_to_earth:y()
-
-      vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
-      vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
-      beta = math.asin(vby/vbx)
       x_d = x_d - beta
     else 
-      x_d = x_p:get()
-      print("Desired Tack Heading " .. x_d)
+      x_d = x_p:get() - beta
+      --print("Desired Tack Heading " .. x_d)
     end
     desired_heading:set(x_d)
 
