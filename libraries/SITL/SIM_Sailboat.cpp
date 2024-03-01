@@ -310,7 +310,7 @@ void Sailboat::update(const struct sitl_input &input)
     accel_body /= mass;
     
     // add in accel due to direction change
-    accel_body.y += 1.1* radians(yaw_rate) * speed;
+    accel_body.y += radians(yaw_rate) * speed;
 
     // now in earth frame
     // remove roll and pitch effects from waves
