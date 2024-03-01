@@ -33,6 +33,8 @@ local beta = 0.0
 local vby = 0.0
 local vbx = 0.0
 local x_d = 0.0
+local R = 5.0
+local delta = 0.0
 
 -- returns null if param cant be found
 local wind_dir = Parameter()
@@ -119,7 +121,13 @@ local function PI_controller(kP,kI,iMax,min,max)
 
        local err = crosstrack
        _counter = _counter + 1
- 
+       
+       local crosstrack = constrain(e:get(),-R,R)
+       delta = math.sqrt(R^2 - crosstrack^2)
+       if delta == 0.0 then
+         delta = 0.01
+       end
+       _kp = 1/delta
        local P = _kP * err
        if ((_total < _max and _total > _min) or (_total >= _max and err < 0) or (_total <= _min and err > 0)) then
           _I = _I + _kI * err * dt
@@ -173,7 +181,7 @@ local function update()
     if tack:get() == 0 then
       x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
       x_d = x_p:get() - x_r
-      x_d = x_d - beta
+      x_d = x_d 
     else 
       x_d = x_p:get() - beta
       --print("Desired Tack Heading " .. x_d)
