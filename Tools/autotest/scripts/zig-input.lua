@@ -18,8 +18,18 @@ local aux_changed = false
 local MAV_SEVERITY_INFO = 6
 local STRCTL_ENABLE = 0
 local left = false
+local start_heading = 0
 
-function update()
+local function wrap_180(heading)
+    if heading > 180 then
+        heading = heading - 360
+    elseif heading < -180 then
+        heading = heading + 360
+    end
+    return heading
+end
+
+local function update()
    
     local aux_pos = rc:get_aux_cached(AUX_FUNCTION_NUM)
     if aux_pos ~= LAST_AUX_POS then
@@ -31,6 +41,10 @@ function update()
 
     if STRCTL_ENABLE == 1 then
         print("Performing Step")
+        start_heading = ahrs:get_yaw()
+        start_heading  = wrap_180(start_heading/math.pi*180)
+        print("Heading: " .. start_heading)
+        SRV_Channels:set_output_pwm(94,1500-150)
     return yaw_rate_controller, 500
    end
     return update, 100
@@ -43,16 +57,14 @@ function yaw_rate_controller()
     if aux_pos ~= LAST_AUX_POS then
        LAST_AUX_POS = aux_pos
        aux_changed = not(aux_changed)
-       gcs:send_text(MAV_SEVERITY_INFO, string.format("Aux set to %u", aux_pos))
+       gcs:send_text(MAV_SEVERITY_INFO, string.format("Aux set to %u", aux_pos)) 
     end
 
-    if left then
-        SRV_Channels:set_output_pwm(94,1500-150)
-        left = false
-        gcs:send_text(0,"Left")
-    else 
+    if (wrap_180(ahrs:get_yaw()/math.pi*180) - start_heading) > 10 then
         SRV_Channels:set_output_pwm(94,1500+150)
-        left = true
+        gcs:send_text(0,"Left")
+    elseif (wrap_180(ahrs:get_yaw()/math.pi*180) - start_heading) < -10 then
+        SRV_Channels:set_output_pwm(94,1500-150)
         gcs:send_text(0,"Right")
     end
     if not(aux_changed)  then
@@ -62,7 +74,7 @@ function yaw_rate_controller()
      end
 
 
-    return yaw_rate_controller,1000
+    return yaw_rate_controller,50
 end
 
 return update()

@@ -24,6 +24,7 @@
 #include <AP_Math/AP_Math.h>
 #include <string.h>
 #include <stdio.h>
+#include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -85,6 +86,37 @@ void Sailboat::calc_lift_and_drag(float wind_speed, float angle_of_attack_deg, f
     }
 }
 
+void Sailboat::calc_lift_and_drag_rudder(float boat_speed, float angle_of_attack_deg, float& lift, float& drag) const
+{
+     const uint16_t index_width_deg = 5;
+    const uint8_t index_max = ARRAY_SIZE(lift_curve_rudder) -1;
+
+    // Convert to expected range
+    angle_of_attack_deg = wrap_180(angle_of_attack_deg);
+
+    // assume a symmetrical airfoil
+    float sign = 1;
+    if (angle_of_attack_deg < 0 )
+    {
+        sign = -1;
+    }
+    const float aoa = fabs(angle_of_attack_deg);
+
+     // check extremes
+    if (aoa <= 0.0f) {
+        lift = lift_curve_rudder[0];
+        drag = drag_curve_rudder[0];
+    } else if (aoa >= index_max * index_width_deg) {
+        lift = lift_curve_rudder[index_max];
+        drag = drag_curve_rudder[index_max];
+    } else {
+        uint8_t index = constrain_int16(aoa / index_width_deg, 0, index_max);
+        float remainder = aoa - (index * index_width_deg);
+        lift = sign * linear_interpolate(lift_curve_rudder[index], lift_curve_rudder[index+1], remainder, 0.0f, index_width_deg);
+        drag = linear_interpolate(drag_curve_rudder[index], drag_curve_rudder[index+1], remainder, 0.0f, index_width_deg);
+    }
+}
+
 // return turning circle (diameter) in meters for steering angle proportion in the range -1 to +1
 float Sailboat::get_turn_circle(float steering) const
 {
@@ -107,11 +139,28 @@ float Sailboat::get_yaw_rate(float steering, float speed) const
     return rate;
 }
 
+// return yaw rate in rad/sec given a steering input (in the range -1 to +1) and speed in m/s
+// without environmental forces
+float Sailboat::get_yaw_rate_df(float rf, float u, float v, float dt, float vdot, float& yaw_acc) const
+{
+    yaw_acc = -(yaw_rate * -0.05 + v) * u  + rf + u * mass * v - 0.47 * yaw_rate -vdot * 0.56938;
+    return (yaw_acc / 0.15 * dt + yaw_rate);
+
+}
+
+// return the sway rate in rad/sec
+float Sailboat::get_sway_velocity(float rf, float& sway_acc, float u, float r, float dt) const
+{
+    sway_acc = 2 * rf - 0.56938 * u - sway_acc * 2.5 - 0.08 * u *r;
+    sway_acc /= 4.8532;
+    return constrain_float(sway_acc * dt + sway_rate,-0.01,0.01);
+}
+
 // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
 float Sailboat::get_lat_accel(float steering, float speed) const
 {
-    float yaw_rate = get_yaw_rate(steering, speed);
-    float accel = radians(yaw_rate) * speed;
+    float yawrate = get_yaw_rate(steering, speed);
+    float accel = radians(yawrate) * speed;
     return accel;
 }
 
@@ -184,8 +233,9 @@ void Sailboat::update(const struct sitl_input &input)
     update_wind(input);
 
     // in sailboats the steering controls the rudder, the throttle controls the main sail position
-    float steering = 2*((input.servos[STEERING_SERVO_CH]-1000)/1000.0f - 0.5f);
-
+    float steering = -((input.servos[STEERING_SERVO_CH]-1500)/500.0f*32.0f);
+    //char str[15] = "Rudder Angle";
+    //send_message(str, steering);
     // calculate apparent wind in earth-frame (this is the direction the wind is coming from)
     // Note than the SITL wind direction is defined as the direction the wind is travelling to
     // This is accounted for in these calculations
@@ -282,10 +332,46 @@ void Sailboat::update(const struct sitl_input &input)
     // speed along x axis, +ve is forward
     float speed = velocity_body.x;
 
-    // yaw rate in degrees/s
-    float yaw_rate = get_yaw_rate(steering, speed);
+    // calculate lift and drag force for a rudder 
+    float lift_rudder, drag_rudder;
+    float boat_speed = sqrt((double)(velocity_body.x)*(double)(velocity_body.x) + (double)(velocity_body.y)*(double)(velocity_body.y));
+    
+    // Calculate Angle of Attack
+    float v_aru = -velocity_body.x ;
+    float v_arv =-yaw_rate*xr; // -yaw_rate*xr
+    float alpha_ar = atan2(v_arv, v_aru);
+    float alpha_a = alpha_ar - radians(steering);
 
-    gyro = Vector3f(0,0,radians(yaw_rate)) + wave_gyro;
+    calc_lift_and_drag_rudder(boat_speed, degrees(alpha_a), lift_rudder, drag_rudder);
+
+    // Rudder lift and drag force 
+    drag_rudder = drag_rudder + lift_rudder * rudder_area * (M_PI * zeta_r * d_r * d_r);
+    float lift_force_rudder = 0.5f * rho_w * rudder_area * lift_rudder * (v_aru*v_aru + v_arv*v_arv);
+    float drag_force_rudder = 0.5f * rho_w * rudder_area * drag_rudder * (v_aru*v_aru + v_arv*v_arv);
+    
+    // Rudder Forces and Moments
+    float Nr =  xr * (lift_force_rudder * cos(alpha_ar) + drag_force_rudder * sin(alpha_ar));
+    float Yr = (lift_force_rudder * cos(alpha_ar) + drag_force_rudder * sin(alpha_ar));
+
+    // Acceleration and Velcotiy Calculation
+    yaw_rate = get_yaw_rate_df(Nr, velocity_body.x, velocity_body.y, delta_time, accel_body.y, yaw_accel);
+
+    sway_rate = get_sway_velocity(Yr, sway_accel, velocity_body.x, yaw_rate, delta_time);
+
+    sim_time = sim_time + delta_time;
+    if (sim_time > 0.1 )
+    {
+        //char str[15] = " R: ";
+        //send_message(str,  rudder_force);
+        //char str1[15] = " Yaw: ";
+        //send_message(str1, yaw_rate);
+        sim_time = 0;
+    }
+    
+    // yaw rate in degrees/s
+    //yaw_rate = get_yaw_rate(steering, speed);
+
+    gyro = Vector3f(0,0,yaw_rate) + wave_gyro;
 
     // update attitude
     dcm.rotate(gyro * delta_time);
@@ -310,7 +396,8 @@ void Sailboat::update(const struct sitl_input &input)
     accel_body /= mass;
     
     // add in accel due to direction change
-    accel_body.y += radians(yaw_rate) * speed;
+    accel_body.y += yaw_rate * speed;
+    //velocity_body.y = sway_rate;
 
     // now in earth frame
     // remove roll and pitch effects from waves
@@ -321,12 +408,12 @@ void Sailboat::update(const struct sitl_input &input)
     Vector3f accel_earth = temp_dcm * accel_body;
 
     // we are on the ground, so our vertical accel is zero
-    accel_earth.z = 0 + wave_heave;
+   // accel_earth.z = 0 + wave_heave;
 
     // work out acceleration as seen by the accelerometers. It sees the kinematic
     // acceleration (ie. real movement), plus gravity
     accel_body = dcm.transposed() * (accel_earth + Vector3f(0, 0, -GRAVITY_MSS));
-
+    
     // tide calcs
     Vector3f tide_velocity_ef;
      if (hal.util->get_soft_armed() && !is_zero(sitl->tide.speed) ) {
@@ -337,7 +424,7 @@ void Sailboat::update(const struct sitl_input &input)
 
     // new velocity vector
     velocity_ef_water += accel_earth * delta_time;
-    velocity_ef = velocity_ef_water + tide_velocity_ef;
+    velocity_ef = velocity_ef_water; // +tide velocity
 
     // new position vector
     position += (velocity_ef * delta_time).todouble();
@@ -352,6 +439,24 @@ void Sailboat::update(const struct sitl_input &input)
     // update wave calculations
     update_wave(delta_time);
 
+    // Log the velocity in the body frame from SITL
+    // @LoggerMessage: SIM2
+    // @Description: Additional simulator state
+    // @Field: TimeUS: Time since system startup
+    // @Field: Bx: x velocity in bf
+    // @Field: By: y velocity in bf
+    // @Field: Rf: Rudder Force
+    // @Field: Ya: Yaw acceleration
+    // @Field: Yv: Yaw Velocity
+
+    AP::logger().WriteStreaming("SIM3", "TimeUS,Bx,By,Rf,Na,Nv,Ra",
+                                    "Qffffff",
+                                    AP_HAL::micros64(),
+                                    velocity_body.x, velocity_body.y, Nr, yaw_accel/M_PI*180, yaw_rate/M_PI*180,steering);
+    AP::logger().WriteStreaming("SIM4", "TimeUS,Nr,Yr,Ya,Yv",
+                                    "Qffff",
+                                    AP_HAL::micros64(),
+                                    Nr, Yr, sway_accel, sway_rate);
 }
 
 } // namespace SITL
