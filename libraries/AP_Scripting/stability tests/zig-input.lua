@@ -60,10 +60,10 @@ function yaw_rate_controller()
        gcs:send_text(MAV_SEVERITY_INFO, string.format("Aux set to %u", aux_pos)) 
     end
 
-    if (wrap_180(ahrs:get_yaw()/math.pi*180) - start_heading) > 10 then
+    if (wrap_180(ahrs:get_yaw()/math.pi*180) - start_heading) < -10 then
         SRV_Channels:set_output_pwm(94,1500+150)
         gcs:send_text(0,"Left")
-    elseif (wrap_180(ahrs:get_yaw()/math.pi*180) - start_heading) < -10 then
+    elseif (wrap_180(ahrs:get_yaw()/math.pi*180) - start_heading) > 10 then
         SRV_Channels:set_output_pwm(94,1500-150)
         gcs:send_text(0,"Right")
     end

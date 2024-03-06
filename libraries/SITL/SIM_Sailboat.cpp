@@ -143,17 +143,16 @@ float Sailboat::get_yaw_rate(float steering, float speed) const
 // without environmental forces
 float Sailboat::get_yaw_rate_df(float rf, float u, float v, float dt, float vdot, float& yaw_acc) const
 {
-    yaw_acc = -(yaw_rate * -0.05 + v) * u  + rf + u * mass * v - 0.47 * yaw_rate -vdot * 0.56938;
+    yaw_acc = -(yaw_rate * -0.05 + v) * u  + rf - 0.47 * yaw_rate -vdot * 0.56938 ;
     return (yaw_acc / 0.15 * dt + yaw_rate);
-
 }
 
 // return the sway rate in rad/sec
 float Sailboat::get_sway_velocity(float rf, float& sway_acc, float u, float r, float dt) const
 {
-    sway_acc = 2 * rf - 0.56938 * u - sway_acc * 2.5 - 0.08 * u *r;
+    sway_acc = rf - 0.56938 * u - sway_acc * 2.5 - 0.08 * u *r;
     sway_acc /= 4.8532;
-    return constrain_float(sway_acc * dt + sway_rate,-0.01,0.01);
+    return constrain_float(sway_acc * dt + sway_rate,-0.1,0.1);
 }
 
 // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
@@ -233,7 +232,7 @@ void Sailboat::update(const struct sitl_input &input)
     update_wind(input);
 
     // in sailboats the steering controls the rudder, the throttle controls the main sail position
-    float steering = -((input.servos[STEERING_SERVO_CH]-1500)/500.0f*32.0f);
+    float steering = ((input.servos[STEERING_SERVO_CH]-1500)/500.0f*32.0f);
     //char str[15] = "Rudder Angle";
     //send_message(str, steering);
     // calculate apparent wind in earth-frame (this is the direction the wind is coming from)
@@ -346,14 +345,14 @@ void Sailboat::update(const struct sitl_input &input)
 
     // Rudder lift and drag force 
     drag_rudder = drag_rudder + lift_rudder * rudder_area * (M_PI * zeta_r * d_r * d_r);
-    float lift_force_rudder = 0.5f * rho_w * rudder_area * lift_rudder * (v_aru*v_aru + v_arv*v_arv);
-    float drag_force_rudder = 0.5f * rho_w * rudder_area * drag_rudder * (v_aru*v_aru + v_arv*v_arv);
+    float lift_force_rudder = 0.5f * rho_w * rudder_area * lift_rudder * (v_aru*v_aru + velocity_body.y*velocity_body.y);
+    float drag_force_rudder = 0.5f * rho_w * rudder_area * drag_rudder * (v_aru*v_aru + velocity_body.y*velocity_body.y);
     
     // Rudder Forces and Moments
     float Nr =  xr * (lift_force_rudder * cos(alpha_ar) + drag_force_rudder * sin(alpha_ar));
     float Yr = (lift_force_rudder * cos(alpha_ar) + drag_force_rudder * sin(alpha_ar));
 
-    // Acceleration and Velcotiy Calculation
+    // Acceleration and Velocity Calculation
     yaw_rate = get_yaw_rate_df(Nr, velocity_body.x, velocity_body.y, delta_time, accel_body.y, yaw_accel);
 
     sway_rate = get_sway_velocity(Yr, sway_accel, velocity_body.x, yaw_rate, delta_time);
@@ -397,7 +396,7 @@ void Sailboat::update(const struct sitl_input &input)
     
     // add in accel due to direction change
     accel_body.y += yaw_rate * speed;
-    //velocity_body.y = sway_rate;
+    velocity_body.y = sway_rate;
 
     // now in earth frame
     // remove roll and pitch effects from waves
@@ -453,10 +452,10 @@ void Sailboat::update(const struct sitl_input &input)
                                     "Qffffff",
                                     AP_HAL::micros64(),
                                     velocity_body.x, velocity_body.y, Nr, yaw_accel/M_PI*180, yaw_rate/M_PI*180,steering);
-    AP::logger().WriteStreaming("SIM4", "TimeUS,Nr,Yr,Ya,Yv",
+    AP::logger().WriteStreaming("SIM4", "TimeUS,L,D,Ya,Yv",
                                     "Qffff",
                                     AP_HAL::micros64(),
-                                    Nr, Yr, sway_accel, sway_rate);
+                                    lift_force_rudder, drag_force_rudder, sway_accel, sway_rate);
 }
 
 } // namespace SITL

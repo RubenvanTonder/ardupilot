@@ -98,7 +98,7 @@ private:
     const float mass = 2.5f;
     
     // Rudder Dimensions
-    float xr = 0.45f;
+    float xr = 0.55f;
     float zr = 0.2f;
     float rudder_area = 0.008f;
     float zeta_r = 1.0f;        // Rudder Efficiency
