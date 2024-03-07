@@ -21,6 +21,7 @@ local max_tack_distance = 10.0
 local tack_heading = math.pi/4
 local no_go_zone = math.pi/4
 local tacking = 0
+local going_home
 
 -- current location of the sailboat
 local current_location
@@ -28,6 +29,7 @@ local current_location
 -- track heading angle
 local track_heading_angle = 0
 
+local heading_to_waypoint = 0.0
 -- track length
 local l_track = 0.0
 
@@ -80,6 +82,15 @@ local function circle_of_acceptance(current, target_waypoint)
     end
 end
 
+-- Flip angle to range fro,m -pi -> pi
+local function flip(angle)
+    if angle > math.pi then
+        angle = angle -2*math.pi
+    elseif angle <-math.pi then
+        angle = angle + 2*math.pi
+    end
+    return angle
+end
 
 -- Calculate the bearing to and the length between waypoints
 local function bearing_and_length_to_waypoint(dest, src)
@@ -110,32 +121,44 @@ end
 local function tack()
     -- Calculate if a tack is required
     -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
-    apparent_wind_angle = math.abs(-math.rad(wind_dir:get()) + track_heading_angle)
+    local wind_angle_radians = math.rad(wind_dir:get())
+    apparent_wind_angle = -wind_angle_radians + math.abs(track_heading_angle)
     print("Apparent Wind Angle " .. apparent_wind_angle)
-    if apparent_wind_angle < no_go_zone then
+    if math.abs(apparent_wind_angle) < no_go_zone then
         print("Tack Required")
         tacking = 1
                 
         -- Perform tack right
         if tack_right then 
-            track_heading_angle = apparent_wind_angle + tack_heading
+            track_heading_angle = wind_angle_radians + tack_heading
             print("Desired Heading Angle " .. track_heading_angle)
             print("Tack Right")
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e > max_tack_distance then
                 tack_right = false
-                track_heading_angle = apparent_wind_angle - tack_heading
+                track_heading_angle = wind_angle_radians - tack_heading
             end
             -- Perform tack left
         else
-            track_heading_angle = apparent_wind_angle - tack_heading
+            track_heading_angle = wind_angle_radians - tack_heading
             print("Desired Heading Angle " .. track_heading_angle)
             print("Tack Left")
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e < -max_tack_distance then
                 print("Switch Tack")
                 tack_right = true
-                track_heading_angle = apparent_wind_angle + tack_heading
+                track_heading_angle = wind_angle_radians + tack_heading
+            end
+        end
+
+        if going_home then
+            heading_to_waypoint = current_location:get_distance_NE(waypoint.mission[0]) 
+            heading_to_waypoint = math.atan(heading_to_waypoint:y(), heading_to_waypoint:x()) 
+            print("Heading to waypoint: ".. heading_to_waypoint)
+            
+            if math.abs(-apparent_wind_angle + math.abs(heading_to_waypoint)) < no_go_zone then
+                print("Go Directly to Waypoint")
+                track_heading_angle = heading_to_waypoint
             end
         end
 
@@ -169,7 +192,10 @@ function UPDATE()
             loaded = true
         end
 
+        
+
         if (current_waypoint < waypoint.total) then
+            going_home = false
             -- Get the Current Location of the sailboat 
             -- Home will only stay fixed when sailboat is armed
             current_location = ahrs:get_location()
@@ -196,14 +222,28 @@ function UPDATE()
             tack()
 
         else 
+            going_home = true
+            -- Update Current Position
+            current_location = ahrs:get_location()
+
             -- Returning home
             print("Returning to Home, Current Waypoint: " .. current_waypoint)
             -- Calculate the bearing and length between source and destination waypoint
-            bearing_and_length_to_waypoint(waypoint.mission[0], waypoint.mission[current_waypoint])
+            bearing_and_length_to_waypoint(waypoint.mission[0], waypoint.mission[waypoint.total])
+            print("Track Heading Angle: " .. track_heading_angle)
             -- Get distance along the track and cross-track error between home and waypoint 1
-            guidance_axis_calc(current_location, waypoint.mission[current_waypoint])
+            guidance_axis_calc(current_location, waypoint.mission[waypoint.total])
             -- Check if tack is required
             tack()
+
+            -- Check if waypoint has been reached
+            waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[0])
+            if waypoint_reached then
+                current_waypoint = current_waypoint + 1
+                print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
+                current_waypoint = 0;
+                waypoint_reached = false
+            end
         end
         -- Print if global param change failed
         if not table_track_heading:set(track_heading_angle) then

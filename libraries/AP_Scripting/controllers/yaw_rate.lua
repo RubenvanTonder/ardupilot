@@ -75,7 +75,8 @@ end
 
 local previous_heading = 0.0
 local current_heading = 0.0
-local d_psi = 0.0
+local previous_desired_heading = 0.0
+local desired_yaw = 0.0
 
 
 local function delay()
@@ -221,22 +222,29 @@ function update()
       -- issue is get_yaw() gets transform to the range of -pi - pi and I need a method to change it to follow the range correctly
       current_heading = ahrs:get_yaw()
 
+      -- Get desired heading
+      desired_yaw = desired_heading:get()
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
       if (previous_heading - current_heading) < -math.pi then
          current_heading = current_heading - 2 * math.pi
       elseif (previous_heading - current_heading) > math.pi then
          current_heading = current_heading + 2 * math.pi
       end
+       -- Change desired yaw from -pi - pi  to -2*pi - 2*pi
+      --if (previous_desired_heading - desired_yaw) < -math.pi then
+      --   desired_yaw = desired_yaw - 2 * math.pi
+      --elseif (previous_desired_heading - desired_yaw) > math.pi then
+      --   desired_yaw = desired_yaw + 2 * math.pi
+      --end
 
       previous_heading = current_heading
-
-      rudder_out = STR_PI.update(desired_heading:get(), current_heading)
+      rudder_out = STR_PI.update(desired_yaw, current_heading)
 
       rudder_out = constrain(rudder_out, -1, 1)
 
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
       STR_PI.log("STRC")
-      logger.write("STRD",'DesYaw,Yaw,PrevYaw','fff',desired_heading:get(),current_heading,previous_heading)
+      logger.write("STRD",'DesYaw,Yaw,PrevYaw','fff',desired_yaw,current_heading,previous_heading)
    
       local max_change = STRCTL_SLEW_RATE:get() * (STRCTL_PWM_MAX:get() - STRCTL_PWM_MIN:get()) * 0.01 / UPDATE_RATE_HZ
    
