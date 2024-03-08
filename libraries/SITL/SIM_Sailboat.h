@@ -78,7 +78,7 @@ private:
     
     float starting_sail_angle = 30.0f; //starting sail angle for winch controlled sail
     float current_sail_angle = starting_sail_angle; // current sail angle for winch controlled sail
-    float previous_sail_angle; // previous sail angle for winch controlled sail
+    float previous_sail_angle = 30.0f; // previous sail angle for winch controlled sail
 
     float timer; // timer to count to 1s and then send message to terminal in SITL
 

@@ -150,8 +150,9 @@ float Sailboat::get_yaw_rate_df(float rf, float u, float v, float dt, float vdot
 // return the sway rate in rad/sec
 float Sailboat::get_sway_velocity(float rf, float& sway_acc, float u, float r, float dt) const
 {
-    sway_acc = rf - 0.56938 * u - sway_acc * 2.5 - 0.08 * u *r;
+    sway_acc = rf - 0.56938 * u - sway_acc * 2.5 - 0.08 * u *r-sway_rate*1.5;
     sway_acc /= 4.8532;
+    constrain_float(sway_acc,-0.1,-0.1);
     return constrain_float(sway_acc * dt + sway_rate,-0.1,0.1);
 }
 
@@ -266,27 +267,29 @@ void Sailboat::update(const struct sitl_input &input)
         aoa_deg = wind_apparent_dir_bf - wing_angle_bf;
 
     } else if (sitl->sail_type.get() == 3){
-        // mainsail with sheet but controller with winch in and out of sail not anlge controller
+        // mainsail with sheet but controller with winch in and out of sail not angle controller
 
     	// servo rate of change in angle
         float servo_rate = 10.0f;
 
         // calculate rate from servo output 
-        float servo_rate_set = constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * servo_rate, -servo_rate, servo_rate);
+        float servo_rate_set = constrain_float(((input.servos[MAINSAIL_SERVO_CH]-1600)/100) * servo_rate, -servo_rate, servo_rate);
 
         // angle change due to time and servo rate
         float servo_angle_change = servo_rate_set * delta_time;
 
         // update current sail angle
-        current_sail_angle = constrain_float(previous_sail_angle + servo_angle_change, -60.0f, 60.0f);
-        current_sail_angle = previous_sail_angle;
+        current_sail_angle = constrain_float(abs(previous_sail_angle) + servo_angle_change, 30.0f, 60.0f);
+        current_sail_angle = abs(previous_sail_angle);
+
 
         char msg[] = " Current Sail Angle: ";
         float data = current_sail_angle;
 
         timer = timer + delta_time;
         if (timer >= 1.0f) {
-        send_message(msg, data);
+        //send_message(msg, data);
+       // printf(" Servo rate %f ", servo_angle_change);
         timer = 0.0f;
         }
 
@@ -296,7 +299,9 @@ void Sailboat::update(const struct sitl_input &input)
         if (is_negative(wind_apparent_dir_bf)) {
             // take into account the current tack
             aoa_deg *= -1;
+            
         }
+       // printf("%f", aoa_deg);
 
     } else {
         // mainsail with sheet
@@ -395,8 +400,7 @@ void Sailboat::update(const struct sitl_input &input)
     accel_body /= mass;
     
     // add in accel due to direction change
-    accel_body.y += yaw_rate * speed;
-    velocity_body.y = sway_rate;
+    accel_body.y += yaw_rate * speed *1.1;
 
     // now in earth frame
     // remove roll and pitch effects from waves
@@ -452,10 +456,10 @@ void Sailboat::update(const struct sitl_input &input)
                                     "Qffffff",
                                     AP_HAL::micros64(),
                                     velocity_body.x, velocity_body.y, Nr, yaw_accel/M_PI*180, yaw_rate/M_PI*180,steering);
-    AP::logger().WriteStreaming("SIM4", "TimeUS,L,D,Ya,Yv",
-                                    "Qffff",
+    AP::logger().WriteStreaming("SIM4", "TimeUS,L,D,Ya,Yv,Sa",
+                                    "Qfffff",
                                     AP_HAL::micros64(),
-                                    lift_force_rudder, drag_force_rudder, sway_accel, sway_rate);
+                                    lift_wf, drag_wf, sway_accel, sway_rate,current_sail_angle);
 }
 
 } // namespace SITL

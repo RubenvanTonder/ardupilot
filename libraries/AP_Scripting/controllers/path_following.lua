@@ -180,7 +180,7 @@ local function update()
 
     if tack:get() == 0 then
       x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
-      x_d = x_p:get() - x_r
+      x_d = x_p:get() - x_r - beta
       x_d = x_d 
     else 
       x_d = x_p:get() - beta
