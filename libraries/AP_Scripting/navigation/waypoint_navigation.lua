@@ -74,8 +74,14 @@ end
 -- Calculate if waypoint has been reached
 local function circle_of_acceptance(current, target_waypoint)
     local distance = current:get_distance_NE(target_waypoint)
-    local distance = math.sqrt(distance:x()^2 + distance:y()^2)
-    if distance < 5 then
+  local x = distance:x()
+    local y =  distance:y()
+    local distance = math.sqrt(x^2 + y^2)
+    local in_track_distance = math.cos(track_heading_angle) * x + math.sin(track_heading_angle) * y
+    print("in track distance" .. in_track_distance)
+    if distance < 5  then
+        return true
+    elseif (in_track_distance) < 0 then
         return true
     else 
         return false
@@ -151,25 +157,25 @@ local function tack()
             end
         end
 
-        if going_home then
-            heading_to_waypoint = current_location:get_distance_NE(waypoint.mission[0]) 
-            heading_to_waypoint = math.atan(heading_to_waypoint:y(), heading_to_waypoint:x()) 
-            print("Heading to waypoint: ".. heading_to_waypoint)
+        --if going_home then
+          --  heading_to_waypoint = current_location:get_distance_NE(waypoint.mission[0]) 
+          --  heading_to_waypoint = math.atan(heading_to_waypoint:y(), heading_to_waypoint:x()) 
+         --   print("Heading to waypoint: ".. heading_to_waypoint)
             
-            if math.abs(-apparent_wind_angle + math.abs(heading_to_waypoint)) < no_go_zone then
-                print("Go Directly to Waypoint")
-                track_heading_angle = heading_to_waypoint
-            end
-        else 
-            heading_to_waypoint = current_location:get_distance_NE(waypoint.mission[current_location+1]) 
-            heading_to_waypoint = math.atan(heading_to_waypoint:y(), heading_to_waypoint:x()) 
-            print("Heading to waypoint: ".. heading_to_waypoint)
+          --  if math.abs(-apparent_wind_angle + math.abs(heading_to_waypoint)) < no_go_zone then
+          --      print("Go Directly to Waypoint")
+                --track_heading_angle = heading_to_waypoint
+           -- end
+        --else 
+           -- heading_to_waypoint = current_location:get_distance_NE(waypoint.mission[current_waypoint]) 
+          --  heading_to_waypoint = math.atan(heading_to_waypoint:y(), heading_to_waypoint:x()) 
+           -- print("Heading to waypoint: ".. heading_to_waypoint)
             
-            if math.abs(-apparent_wind_angle + math.abs(heading_to_waypoint)) < no_go_zone then
-                print("Go Directly to Waypoint")
-                track_heading_angle = heading_to_waypoint
-            end
-        end
+           -- if math.abs(-apparent_wind_angle + math.abs(heading_to_waypoint)) < no_go_zone then
+            --    print("Go Directly to Waypoint")
+           --     --track_heading_angle = heading_to_waypoint
+        --    end
+        --end
 
     else
     print("Tack not Required")
@@ -188,15 +194,18 @@ function UPDATE()
 
     -- Wait for sailboat to be armed
     if arming:is_armed() then
-        if not started then
-            delay()
-            started = true
-        end
+        --if not started then
+         --   delay()
+         --   started = true
+       -- end
         
         -- Log data
         write_to_dataflash()
+
         -- Load in the waypoints into array
+        print("About to load waypoints")
         if not loaded then
+            print("Waypoints loaded")
             load_waypoints()
             loaded = true
         end

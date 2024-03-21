@@ -246,7 +246,7 @@ void Sailboat::update(const struct sitl_input &input)
     float roll, pitch, yaw;
     dcm.to_euler(&roll, &pitch, &yaw);
 
-    const float wind_apparent_dir_bf = wrap_180(wind_apparent_dir_ef - degrees(yaw));
+    const float wind_apparent_dir_bf = wrap_180(degrees(yaw)-wind_apparent_dir_ef);
 
     // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
     rpm[0] = wind_apparent_speed;
@@ -281,10 +281,16 @@ void Sailboat::update(const struct sitl_input &input)
         // update current sail angle
         current_sail_angle = constrain_float(abs(previous_sail_angle) + servo_angle_change, 30.0f, 60.0f);
         current_sail_angle = abs(previous_sail_angle);
+        if (wind_apparent_dir_bf <0){
+            current_sail_angle = M_PI/6;
+        }else if (wind_apparent_dir_bf > 0){
+            current_sail_angle = -M_PI/6;
+        }
+        
 
 
-        char msg[] = " Current Sail Angle: ";
-        float data = current_sail_angle;
+       // char msg[] = " Current Sail Angle: ";
+        //float data = current_sail_angle;
 
         timer = timer + delta_time;
         if (timer >= 1.0f) {
@@ -400,7 +406,7 @@ void Sailboat::update(const struct sitl_input &input)
     accel_body /= mass;
     
     // add in accel due to direction change
-    accel_body.y += yaw_rate * speed *1.1;
+    accel_body.y += yaw_rate * speed ;
 
     // now in earth frame
     // remove roll and pitch effects from waves
