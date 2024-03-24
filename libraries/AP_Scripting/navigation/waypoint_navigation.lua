@@ -157,26 +157,6 @@ local function tack()
             end
         end
 
-        --if going_home then
-          --  heading_to_waypoint = current_location:get_distance_NE(waypoint.mission[0]) 
-          --  heading_to_waypoint = math.atan(heading_to_waypoint:y(), heading_to_waypoint:x()) 
-         --   print("Heading to waypoint: ".. heading_to_waypoint)
-            
-          --  if math.abs(-apparent_wind_angle + math.abs(heading_to_waypoint)) < no_go_zone then
-          --      print("Go Directly to Waypoint")
-                --track_heading_angle = heading_to_waypoint
-           -- end
-        --else 
-           -- heading_to_waypoint = current_location:get_distance_NE(waypoint.mission[current_waypoint]) 
-          --  heading_to_waypoint = math.atan(heading_to_waypoint:y(), heading_to_waypoint:x()) 
-           -- print("Heading to waypoint: ".. heading_to_waypoint)
-            
-           -- if math.abs(-apparent_wind_angle + math.abs(heading_to_waypoint)) < no_go_zone then
-            --    print("Go Directly to Waypoint")
-           --     --track_heading_angle = heading_to_waypoint
-        --    end
-        --end
-
     else
     print("Tack not Required")
     tacking = 0
@@ -272,7 +252,7 @@ function UPDATE()
             print("Could not update crosstrack error to table")
         end
     end
-    return UPDATE, 1000
+    return UPDATE, 200
 end
 
 return UPDATE()

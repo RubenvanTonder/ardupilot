@@ -152,7 +152,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     -- log the controller internals
     function self.log(name)
        -- allow for an external addition to total
-       logger.write(name,'Error,P,I,Total','ffff',_err,_P,_I,_total)
+       logger.write(name,'Error,P,I,Total,xr','fffff',_err,_P,_I,_total,x_r)
     end
  
     -- return the instance
