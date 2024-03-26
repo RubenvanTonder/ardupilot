@@ -10,9 +10,10 @@ UPDATE_RATE_HZ = 25
 
 -- select the servo powering the rudder
 local servo_function = Parameter()
-local servo_func = servo_function:init("SERVO1_FUNCTION")
-local ground_steer = 26
-local servo_number = 3
+servo_function:init("SERVO1_FUNCTION")
+local servo_Original = servo_function:get()
+
+local K_rudder = 94
 
 -- setup a parameter block
 local PARAM_TABLE_KEY = 73
@@ -207,11 +208,13 @@ function update()
       STRCTL_ENABLE = 1
       --desired_heading = ahrs:get_yaw() + math.pi/6
       -- Initialize PI Controller
+      servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
       delay()
    end
    if not(aux_changed)  then
       STRCTL_ENABLE = 0
+      servo_function:set(servo_Original)
       SRV_Channels:set_output_pwm(94,1500)
    end
 
