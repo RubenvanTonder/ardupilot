@@ -93,8 +93,8 @@ STRCTL_PWM_MAX = bind_add_param('PWM_MAX', 3, 2000)
 STRCTL_PWM_IDLE = bind_add_param('PWM_IDLE', 4, 1500)
 
 -- P and I gains for controller
-STRCTL_PID_P = bind_add_param('PID_P', 5, 1.2)
-STRCTL_PID_I = bind_add_param('PID_I', 6, 0.24)
+STRCTL_PID_P = bind_add_param('PID_P', 5, 0.67)
+STRCTL_PID_I = bind_add_param('PID_I', 6, 0.33)
 
 -- maximum I contribution
 STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 0.25)
@@ -206,7 +206,6 @@ function update()
    if aux_changed and STRCTL_ENABLE == 0 then
       gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
-      --desired_heading = ahrs:get_yaw() + math.pi/6
       -- Initialize PI Controller
       servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
@@ -226,7 +225,9 @@ function update()
       current_heading = ahrs:get_yaw()
 
       -- Get desired heading
+      -- path following contrller or tacking controller
       desired_yaw = desired_heading:get()
+
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
       if (previous_heading - current_heading) < -math.pi then
          current_heading = current_heading - 2 * math.pi

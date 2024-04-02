@@ -192,6 +192,7 @@ end
  local STRCTL_ENABLE = 0
  local AUX_FUNCTION_NUM = 300
  local aux_changed = false
+ local x_h
 
 function update()
 
@@ -206,6 +207,7 @@ function update()
    if aux_changed and STRCTL_ENABLE == 0 then
       gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
+      x_h = ahrs:get_yaw() + math.pi/6
       -- Initialize PI Controller
       servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
@@ -226,7 +228,10 @@ function update()
 
       -- Get desired heading
       -- path following contrller or tacking controller
-      desired_yaw = desired_heading:get()
+      --desired_yaw = desired_heading:get()
+
+      -- Step response
+      desired_yaw = x_h
 
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
       if (previous_heading - current_heading) < -math.pi then

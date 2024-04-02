@@ -22,7 +22,7 @@ local tack_heading = math.pi/4
 local no_go_zone = math.pi/4
 local tacking = 0
 local going_home
-
+local radius_of_acceptance = 5
 -- current location of the sailboat
 local current_location
 
@@ -63,7 +63,7 @@ end
 local function load_waypoints()
     -- Get total number of waypoints
     waypoint.total = mission:num_commands()-1
-    print("Total waypoints " .. waypoint.total)
+    --print("Total waypoints " .. waypoint.total)
 
     -- Iterate through waypoints
     for i=0, (waypoint.total) do
@@ -78,8 +78,8 @@ local function circle_of_acceptance(current, target_waypoint)
     local y =  distance:y()
     local distance = math.sqrt(x^2 + y^2)
     local in_track_distance = math.cos(track_heading_angle) * x + math.sin(track_heading_angle) * y
-    print("in track distance" .. in_track_distance)
-    if distance < 5  then
+   -- print("in track distance" .. in_track_distance)
+    if distance < radius_of_acceptance  then
         return true
     elseif (in_track_distance) < 0 then
         return true
@@ -117,6 +117,7 @@ end
 
 local function write_to_dataflash()
     logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
+    logger:write('NAV1','N,E','ff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):y()))
   end
 
 local function delay() 
@@ -129,16 +130,16 @@ local function tack()
     -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
     local wind_angle_radians = math.rad(wind_dir:get())
     apparent_wind_angle = -wind_angle_radians + math.abs(track_heading_angle)
-    print("Apparent Wind Angle " .. apparent_wind_angle)
+    --print("Apparent Wind Angle " .. apparent_wind_angle)
     if math.abs(apparent_wind_angle) < no_go_zone then
-        print("Tack Required")
+        --print("Tack Required")
         tacking = 1
                 
         -- Perform tack right
         if tack_right then 
             track_heading_angle = wind_angle_radians + tack_heading
-            print("Desired Heading Angle " .. track_heading_angle)
-            print("Tack Right")
+            --print("Desired Heading Angle " .. track_heading_angle)
+            --print("Tack Right")
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e > max_tack_distance then
                 tack_right = false
@@ -147,18 +148,18 @@ local function tack()
             -- Perform tack left
         else
             track_heading_angle = wind_angle_radians - tack_heading
-            print("Desired Heading Angle " .. track_heading_angle)
-            print("Tack Left")
+            --print("Desired Heading Angle " .. track_heading_angle)
+            --print("Tack Left")
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e < -max_tack_distance then
-                print("Switch Tack")
+                --print("Switch Tack")
                 tack_right = true
                 track_heading_angle = wind_angle_radians + tack_heading
             end
         end
 
     else
-    print("Tack not Required")
+    --print("Tack not Required")
     tacking = 0
     end
     -- Set global tack parameter 
@@ -179,18 +180,16 @@ function UPDATE()
          --   started = true
        -- end
         
-        -- Log data
-        write_to_dataflash()
-
+        
         -- Load in the waypoints into array
-        print("About to load waypoints")
         if not loaded then
-            print("Waypoints loaded")
             load_waypoints()
             loaded = true
         end
 
-        
+        -- Log data
+        write_to_dataflash()
+
 
         if (current_waypoint < waypoint.total) then
             going_home = false
@@ -202,10 +201,10 @@ function UPDATE()
             waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[current_waypoint+1])
             if waypoint_reached then
                 current_waypoint = current_waypoint + 1
-                print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
+                --print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
                 waypoint_reached = false
                 if current_waypoint == waypoint.total then
-                    print("Final waypoint reached")
+                    --print("Final waypoint reached")
                     return UPDATE()
                 end
             end
@@ -217,7 +216,7 @@ function UPDATE()
             guidance_axis_calc(current_location, waypoint.mission[current_waypoint])
 
             -- Check if tack is required
-            tack()
+            --tack()
 
         else 
             going_home = true
@@ -225,34 +224,34 @@ function UPDATE()
             current_location = ahrs:get_location()
 
             -- Returning home
-            print("Returning to Home, Current Waypoint: " .. current_waypoint)
+            --print("Returning to Home, Current Waypoint: " .. current_waypoint)
             -- Calculate the bearing and length between source and destination waypoint
             bearing_and_length_to_waypoint(waypoint.mission[0], waypoint.mission[waypoint.total])
-            print("Track Heading Angle: " .. track_heading_angle)
+            --print("Track Heading Angle: " .. track_heading_angle)
             -- Get distance along the track and cross-track error between home and waypoint 1
             guidance_axis_calc(current_location, waypoint.mission[waypoint.total])
             -- Check if tack is required
-            tack()
+            --tack()
 
             -- Check if waypoint has been reached
             waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[0])
             if waypoint_reached then
                 current_waypoint = current_waypoint + 1
-                print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
+                --print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
                 current_waypoint = 0;
                 waypoint_reached = false
             end
         end
         -- Print if global param change failed
         if not table_track_heading:set(track_heading_angle) then
-            print("Could not update track heading to table")
+            --print("Could not update track heading to table")
         end
 
         if not table_cross_track:set(guidance_axis.e) then
-            print("Could not update crosstrack error to table")
+            --print("Could not update crosstrack error to table")
         end
     end
-    return UPDATE, 200
+    return UPDATE, 250
 end
 
 return UPDATE()

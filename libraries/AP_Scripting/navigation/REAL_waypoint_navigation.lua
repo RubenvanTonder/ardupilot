@@ -1,6 +1,14 @@
 -- Script for navigating between waypoints
 
 -- Global parameters
+-- Create param to mimic global variables
+local PARAM_TABLE_KEY1 = 74
+assert(param:add_table(PARAM_TABLE_KEY1, "Nv_", 5), 'could not add param table')
+assert(param:add_param(PARAM_TABLE_KEY1, 1, 'Heading', 0.0), 'could not add param1')
+assert(param:add_param(PARAM_TABLE_KEY1, 2, 'Crosstrack', 0.0), 'could not add param2')
+assert(param:add_param(PARAM_TABLE_KEY1, 3, 'Tack_Heading', 0.0), 'could not add param3')
+assert(param:add_param(PARAM_TABLE_KEY1, 4, 'Tack', 0.0), 'could not add param3')
+
 local table_track_heading =  Parameter("Nv_Heading")
 local table_cross_track =  Parameter("Nv_Crosstrack")
 local tack_heading = Parameter('Nv_Tack_Heading')
@@ -13,6 +21,8 @@ local wind_dir = Parameter()
 if not wind_dir:init('SIM_WIND_DIR') then
   gcs:send_text(6, 'get SIM_WIND_DIR failed')
 end
+
+
 
 -- Tacking and Indirect waypoint approach
 local apparent_wind_angle
@@ -117,7 +127,6 @@ end
 
 local function write_to_dataflash()
     logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
-    logger:write('NAV1','N,E','ff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):y()))
   end
 
 local function delay() 
@@ -180,16 +189,16 @@ function UPDATE()
          --   started = true
        -- end
         
-        
+        -- Log data
+        write_to_dataflash()
+
         -- Load in the waypoints into array
         if not loaded then
             load_waypoints()
             loaded = true
         end
 
-        -- Log data
-        write_to_dataflash()
-
+        
 
         if (current_waypoint < waypoint.total) then
             going_home = false
@@ -251,7 +260,7 @@ function UPDATE()
             --print("Could not update crosstrack error to table")
         end
     end
-    return UPDATE, 250
+    return UPDATE, 200
 end
 
 return UPDATE()
