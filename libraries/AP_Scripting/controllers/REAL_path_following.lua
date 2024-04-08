@@ -8,6 +8,15 @@ end
 delay()
 UPDATE_RATE_HZ = 10
 
+-- Global parameters
+-- Create param to mimic global variables
+local PARAM_TABLE_KEY1 = 74
+assert(param:add_table(PARAM_TABLE_KEY1, "Nv_", 5), 'could not add param table')
+assert(param:add_param(PARAM_TABLE_KEY1, 1, 'Heading', 0.0), 'could not add param1')
+assert(param:add_param(PARAM_TABLE_KEY1, 2, 'Crosstrack', 0.0), 'could not add param2')
+assert(param:add_param(PARAM_TABLE_KEY1, 3, 'Tack_Heading', 0.0), 'could not add param3')
+assert(param:add_param(PARAM_TABLE_KEY1, 4, 'Tack', 0.0), 'could not add param3')
+
 -- setup a parameter block
 local PARAM_TABLE_KEY = 75
 local PARAM_TABLE_PREFIX = 'PTHCTL_'

@@ -25,6 +25,12 @@ local going_home
 local radius_of_acceptance = 5
 -- current location of the sailboat
 local current_location
+local last_location
+local location1
+local location2
+local location3
+
+local location_counter = 0
 
 -- track heading angle
 local track_heading_angle = 0
@@ -42,7 +48,7 @@ guidance_axis.e = 0.0
 local waypoint = {}
 waypoint.total = 0
 waypoint.mission = {Location(), Location()}
-local current_waypoint = 0
+local current_waypoint = 1
 local loaded = false
 local waypoint_reached = false
 
@@ -62,11 +68,11 @@ end
 -- Load the waypoints
 local function load_waypoints()
     -- Get total number of waypoints
-    waypoint.total = mission:num_commands()-1
-    --print("Total waypoints " .. waypoint.total)
+    waypoint.total = mission:num_commands()
+    gcs:send_text(6,"Mission Commands " .. mission:num_commands())
 
     -- Iterate through waypoints
-    for i=0, (waypoint.total) do
+    for i=0, (waypoint.total-1) do
         waypoint.mission[i] = location(mission:get_item(i))
     end
 end
@@ -80,8 +86,10 @@ local function circle_of_acceptance(current, target_waypoint)
     local in_track_distance = math.cos(track_heading_angle) * x + math.sin(track_heading_angle) * y
    -- print("in track distance" .. in_track_distance)
     if distance < radius_of_acceptance  then
+        gcs:send_text(6,"Sailboat Within Radius of Acceptance")
         return true
     elseif (in_track_distance) < 0 then
+       gcs:send_text(6,"Sailboat passed waypoint")
         return true
     else 
         return false
@@ -117,7 +125,7 @@ end
 
 local function write_to_dataflash()
     logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
-    logger:write('NAV1','N,E','ff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):y()))
+    logger:write('NAV1','N,E,Ns,Es','ffff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):y()),tostring(waypoint.mission[0]:get_distance_NE(current_location):x()),tostring(waypoint.mission[0]:get_distance_NE(current_location):y()))
   end
 
 local function delay() 
@@ -174,31 +182,70 @@ function UPDATE()
     end 
 
     -- Wait for sailboat to be armed
-    if arming:is_armed() then
-        --if not started then
-         --   delay()
-         --   started = true
-       -- end
+    if arming:is_armed()then      
         
-        
-        -- Load in the waypoints into array
+        -- Load in the waypoints into array and initialize location array and last location
         if not loaded then
             load_waypoints()
+            -- Save home location 
+            last_location = ahrs:get_location()
+            print("Lng : " .. last_location:lng())
+            -- Initialize location array
+            location1 = ahrs:get_location()
+            location2 = ahrs:get_location()
+            location3 = ahrs:get_location()
+            print("Lng1 : " .. location1:lng())
+            print("Lng2 : " .. location2:lng())
+            print("Lng3 : " .. location3:lng())
             loaded = true
         end
 
-        -- Log data
-        write_to_dataflash()
+        
 
 
         if (current_waypoint < waypoint.total) then
             going_home = false
             -- Get the Current Location of the sailboat 
             -- Home will only stay fixed when sailboat is armed
-            current_location = ahrs:get_location()
+            
+            -- Update Current Position
+            if (gps:num_sats(0) > 6) then
+                -- Save current location
+                current_location = ahrs:get_location()
+
+                -- Update counter so that oldest sample of location is swopped out with newest
+                if location_counter == 4 then
+                   location_counter = 0 
+                elseif location_counter == 1 then
+                    location1:lat(current_location:lat())
+                    location1:lng(current_location:lng())
+                    print("Loc1 Lat: " .. location1:lat() .. " Loc1 Lng: ".. location1:lng())
+                elseif location_counter == 2 then
+                    location2:lat(current_location:lat())
+                    location2:lng(current_location:lng())
+                    print("Loc2 Lat: " .. location2:lat() .. " Loc2 Lng: ".. location2:lng())
+                elseif location_counter == 3 then
+                    location3:lat(current_location:lat())
+                    location3:lng(current_location:lng())
+                    print("Loc3 Lat: " .. location3:lat() .. " Loc3 Lng: ".. location3:lng())
+                end
+                location_counter = location_counter +1
+                -- Get the average movement of the last three locations
+                local lat_avg = location1:lat()/3 + location2:lat()/3 + location3:lat()/3
+                local lng_avg = location1:lng()/3 + location2:lng()/3 + location3:lng()/3
+                current_location:lat(lat_avg)
+                current_location:lng(lng_avg)
+
+                print("CLng " .. current_location:lng() .. " CLat " .. current_location:lat())
+                -- Save current location as last active location
+                last_location = current_location
+                
+            else 
+                current_location = last_location
+            end
 
             -- Check if waypoint has been reached
-            waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[current_waypoint+1])
+            waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[current_waypoint])
             if waypoint_reached then
                 current_waypoint = current_waypoint + 1
                 --print("Waypoint Reached heading to waypoint number " .. (current_waypoint+1))
@@ -210,10 +257,11 @@ function UPDATE()
             end
 
             -- Calculate the bearing and length between source and destination waypoint
-            bearing_and_length_to_waypoint(waypoint.mission[current_waypoint+1], waypoint.mission[current_waypoint])
+            bearing_and_length_to_waypoint(waypoint.mission[current_waypoint], waypoint.mission[current_waypoint-1])
 
             -- Get distance along the track and cross-track error between home and waypoint 1
-            guidance_axis_calc(current_location, waypoint.mission[current_waypoint])
+            print("Lng: " .. current_location:lng() .. "MLng: " .. waypoint.mission[current_waypoint-1]:lng())
+            guidance_axis_calc(current_location, waypoint.mission[current_waypoint-1])
 
             -- Check if tack is required
             --tack()
@@ -221,7 +269,12 @@ function UPDATE()
         else 
             going_home = true
             -- Update Current Position
-            current_location = ahrs:get_location()
+            if (gps:num_sats() > 6) then
+                current_location = ahrs:get_location()
+                last_location = current_location
+            else 
+                current_location = last_location
+            end
 
             -- Returning home
             --print("Returning to Home, Current Waypoint: " .. current_waypoint)
@@ -242,16 +295,20 @@ function UPDATE()
                 waypoint_reached = false
             end
         end
-        -- Print if global param change failed
-        if not table_track_heading:set(track_heading_angle) then
-            --print("Could not update track heading to table")
-        end
 
-        if not table_cross_track:set(guidance_axis.e) then
-            --print("Could not update crosstrack error to table")
-        end
+    -- Log data
+    write_to_dataflash()
+
+    -- Print if global param change failed
+    if not table_track_heading:set(track_heading_angle) then
+        gcs:send_text(6, "Could not update track heading to table")
     end
-    return UPDATE, 250
+
+    if not table_cross_track:set(guidance_axis.e) then
+        gcs:send_text(6,"Could not update crosstrack error to table")
+    end
+    end
+    return UPDATE, 500
 end
 
 return UPDATE()

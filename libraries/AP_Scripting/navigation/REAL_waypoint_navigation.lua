@@ -1,19 +1,5 @@
 -- Script for navigating between waypoints
 
--- Global parameters
--- Create param to mimic global variables
-local PARAM_TABLE_KEY1 = 74
-assert(param:add_table(PARAM_TABLE_KEY1, "Nv_", 5), 'could not add param table')
-assert(param:add_param(PARAM_TABLE_KEY1, 1, 'Heading', 0.0), 'could not add param1')
-assert(param:add_param(PARAM_TABLE_KEY1, 2, 'Crosstrack', 0.0), 'could not add param2')
-assert(param:add_param(PARAM_TABLE_KEY1, 3, 'Tack_Heading', 0.0), 'could not add param3')
-assert(param:add_param(PARAM_TABLE_KEY1, 4, 'Tack', 0.0), 'could not add param3')
-
-local table_track_heading =  Parameter("Nv_Heading")
-local table_cross_track =  Parameter("Nv_Crosstrack")
-local tack_heading = Parameter('Nv_Tack_Heading')
-local tack_require = Parameter('Nv_Tack')
-
 -- Get the wind direction
 -- for fast param acess it is better to get a param object,
 -- this saves the code searching for the param by name every time
@@ -22,6 +8,11 @@ if not wind_dir:init('SIM_WIND_DIR') then
   gcs:send_text(6, 'get SIM_WIND_DIR failed')
 end
 
+-- Global parameters
+local table_track_heading =  Parameter("Nv_Heading")
+local table_cross_track =  Parameter("Nv_Crosstrack")
+local tack_heading = Parameter('Nv_Tack_Heading')
+local tack_require = Parameter('Nv_Tack')
 
 
 -- Tacking and Indirect waypoint approach
@@ -90,8 +81,10 @@ local function circle_of_acceptance(current, target_waypoint)
     local in_track_distance = math.cos(track_heading_angle) * x + math.sin(track_heading_angle) * y
    -- print("in track distance" .. in_track_distance)
     if distance < radius_of_acceptance  then
+        gcs:send_text(6,"Sailboat Within Radius of Acceptance")
         return true
     elseif (in_track_distance) < 0 then
+        gcs:send_text(6,"Sailboat passed waypoint")
         return true
     else 
         return false
@@ -127,7 +120,10 @@ end
 
 local function write_to_dataflash()
     logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
-  end
+    if (current_waypoint-1 < waypoint.total) then
+        logger:write('NAV1','N,E','ff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint+1]):y()))
+    end
+end
 
 local function delay() 
 

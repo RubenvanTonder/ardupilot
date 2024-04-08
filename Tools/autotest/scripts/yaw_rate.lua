@@ -195,6 +195,7 @@ end
 
 function update()
 
+  
    local aux_pos = rc:get_aux_cached(AUX_FUNCTION_NUM)
    if aux_pos ~= LAST_AUX_POS then
       LAST_AUX_POS = aux_pos
