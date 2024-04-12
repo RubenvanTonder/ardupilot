@@ -66,16 +66,19 @@ function decode()
     if byte == 57 then
         value_read  = 9;
     end
-    if true then
+    if update_param then
         flag_D = false;
         hundreds = false;
         tens = false;
         update_param = false;
-        wind_direction = 100;
-        if not(param:set('MY_WIND_SENSOR',wind_direction)) then
-            gcs:send_text(6, 'LUA: param set failed')
+        wind_direction = wind_direction-178;
+        if wind_direction > 180 then
+           wind_direction = wind_direction-360;
+        end
+        if not(param:set('MY_WIND_SENSOR',(wind_direction))) then
+            gcs:send_text(6, 'LUA: param set failed');
           end
-        gcs:send_text(6,wind_direction)
+        gcs:send_text(6,(wind_direction))
         wind_direction = 0;
     elseif tens then 
         update_param = true;
