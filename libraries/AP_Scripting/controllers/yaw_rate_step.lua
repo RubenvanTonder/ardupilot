@@ -11,7 +11,7 @@ UPDATE_RATE_HZ = 25
 -- select the servo powering the rudder
 local servo_function = Parameter()
 servo_function:init("SERVO1_FUNCTION")
-local servo_Original = servo_function:get()
+local servo_Original = 26
 
 local K_rudder = 94
 
@@ -219,7 +219,7 @@ function update()
       SRV_Channels:set_output_pwm(94,1500)
    end
 
-   if STRCTL_ENABLE == 1 then
+   if STRCTL_ENABLE == 1 and arming:is_armed() then
       -- Find the actual heading angle
       -- Find the difference and feed it into controller
       

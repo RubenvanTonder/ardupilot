@@ -189,14 +189,10 @@ function UPDATE()
             load_waypoints()
             -- Save home location 
             last_location = ahrs:get_location()
-            print("Lng : " .. last_location:lng())
             -- Initialize location array
             location1 = ahrs:get_location()
             location2 = ahrs:get_location()
             location3 = ahrs:get_location()
-            print("Lng1 : " .. location1:lng())
-            print("Lng2 : " .. location2:lng())
-            print("Lng3 : " .. location3:lng())
             loaded = true
         end
 
@@ -219,15 +215,12 @@ function UPDATE()
                 elseif location_counter == 1 then
                     location1:lat(current_location:lat())
                     location1:lng(current_location:lng())
-                    print("Loc1 Lat: " .. location1:lat() .. " Loc1 Lng: ".. location1:lng())
                 elseif location_counter == 2 then
                     location2:lat(current_location:lat())
                     location2:lng(current_location:lng())
-                    print("Loc2 Lat: " .. location2:lat() .. " Loc2 Lng: ".. location2:lng())
                 elseif location_counter == 3 then
                     location3:lat(current_location:lat())
                     location3:lng(current_location:lng())
-                    print("Loc3 Lat: " .. location3:lat() .. " Loc3 Lng: ".. location3:lng())
                 end
                 location_counter = location_counter +1
                 -- Get the average movement of the last three locations
@@ -236,7 +229,6 @@ function UPDATE()
                 current_location:lat(lat_avg)
                 current_location:lng(lng_avg)
 
-                print("CLng " .. current_location:lng() .. " CLat " .. current_location:lat())
                 -- Save current location as last active location
                 last_location = current_location
                 
@@ -260,7 +252,6 @@ function UPDATE()
             bearing_and_length_to_waypoint(waypoint.mission[current_waypoint], waypoint.mission[current_waypoint-1])
 
             -- Get distance along the track and cross-track error between home and waypoint 1
-            print("Lng: " .. current_location:lng() .. "MLng: " .. waypoint.mission[current_waypoint-1]:lng())
             guidance_axis_calc(current_location, waypoint.mission[current_waypoint-1])
 
             -- Check if tack is required
