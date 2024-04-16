@@ -34,7 +34,7 @@ gcs:send_text(0, string.format("param1=%f", param1:get()))
 -- function to decode data on uart
 function decode()
     local byte = port:read()
-
+    
     -- Convert byte from ascii to dec
     if byte == 48 then
         value_read  = 0;

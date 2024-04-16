@@ -80,13 +80,6 @@ local previous_desired_heading = 0.0
 local desired_yaw = 0.0
 
 
-local function delay()
-   
-   return update, 250
-end
-
-
-
 -- MIN, MAX and IDLE PWM for throttle output
 STRCTL_PWM_MIN = bind_add_param('PWM_MIN', 2, 1000)
 STRCTL_PWM_MAX = bind_add_param('PWM_MAX', 3, 2000)
@@ -210,7 +203,6 @@ function update()
       -- Initialize PI Controller
       servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
-      delay()
    end
    if not(aux_changed)  then
       STRCTL_ENABLE = 0

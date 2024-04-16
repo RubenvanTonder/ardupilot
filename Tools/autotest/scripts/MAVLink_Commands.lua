@@ -26,19 +26,13 @@ COMMAND_LONG.fields = {
              { "target_component", "<B" },
              { "confirmation", "<B" },
              }
-
+             
 local msg = {}
 msg.messages = {
   COMMAND_ACK,
   COMMAND_LONG
 }
 
-function get_msg_message(message)
-  local x = 0
-  for x=0,1 do 
-    if msg.message[x].id == message.id
-  end
-end
 
 function get_msgid(msgname)
   local message_map = lua_pcall("MAVLink/mavlink_msg_" .. msgname)
@@ -154,7 +148,7 @@ local MAV_CMD_WIND_DATA = 219
 
 function handle_command_long(cmd)
     if (cmd.command == MAV_CMD_WIND_DATA) then
-        gcs:send_text(0, "Got WIND DATA")
+        gcs:send_text(0, "Got mode change")
 
     elseif (cmd.command == MAV_CMD_WAYPOINT_USER_1) then
         -- return ack from command param value
