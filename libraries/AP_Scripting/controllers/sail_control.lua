@@ -10,9 +10,9 @@ local bat_volt = battery:voltage(0)
 gcs:send_text(6,"Battery Voltage " .. bat_volt)
 local nominal_voltage = 7.88
 local diff = (bat_volt - nominal_voltage)/0.2
-local winch_out_pwm = 1870 + diff*100
-local winch_in_pwm = 1690 + diff*100
 local rest_pwm = 1780 + diff*100
+local winch_out_pwm = rest_pwm + 90 + diff*100
+local winch_in_pwm = rest_pwm - 90 + diff*100
 local sail_servo = 95
 local servo_function = Parameter()
 servo_function:init("SERVO3_FUNCTION")
@@ -44,8 +44,8 @@ local servo_on = false
 local scripting_rc_1 = rc:find_channel_for_option(AUX_FUNCTION_NUM)
 local function update()
     
-    
-    gcs:send_text(6, "RC Pos " .. tostring(scripting_rc_1:norm_input()))
+    --Log Sail Angle
+    logger.write("SAI",'SailPos','f',sail_angle)
     if scripting_rc_1:norm_input() > 0 then
         -- Turn on Sail servo
         if servo_on then

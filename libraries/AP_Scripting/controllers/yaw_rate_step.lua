@@ -253,12 +253,13 @@ function update()
 
       rudder_pwm = STRCTL_PWM_IDLE:get() + rudder_out * (STRCTL_PWM_MAX:get() - STRCTL_PWM_IDLE:get())
       STR_PI.log("STRC")
-      logger.write("STRD",'DesYaw,Yaw,PrevYaw','fff',desired_yaw,current_heading,previous_heading)
+      
    
       local max_change = STRCTL_SLEW_RATE:get() * (STRCTL_PWM_MAX:get() - STRCTL_PWM_MIN:get()) * 0.01 / UPDATE_RATE_HZ
    
       rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
       last_pwm = rudder_pwm
+      logger.write("STRD",'DesYaw,Yaw,PrevYaw,Rudder','ffff',desired_yaw,current_heading,previous_heading,rudder_pwm)
       if STRCTL_THR_CHAN:get() > 0 then
          --gcs:send_text(MAV_SEVERITY_INFO,"Servo Output")
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
