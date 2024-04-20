@@ -1,5 +1,22 @@
--- Example of receiving MAVLink commands
+-- Receiving MAVlink messages from a ground station
 
+-- setup a parameter block
+local PARAM_TABLE_KEY = 76
+assert(param:add_table(PARAM_TABLE_KEY, "Base_", 2), 'could not add param table')
+assert(param:add_param(PARAM_TABLE_KEY, 1, 'Direction', 0.0), 'could not add direction')
+assert(param:add_param(PARAM_TABLE_KEY, 2, 'Speed', 0.0), 'could not add speed')
+
+-- initialize parameters
+local wind_direction = Parameter()
+if not wind_direction:init('Base_Direction') then
+    gcs:send_text(6, 'get Base_Direction failed')
+end
+local wind_speed = Parameter()
+if not wind_speed:init('Base_Speed') then
+    gcs:send_text(6, 'get Base_Speed failed')
+end
+
+-- Structure of COMMAND_ACK
 local COMMAND_ACK = {}
 COMMAND_ACK.id = 77
 COMMAND_ACK.fields = {
@@ -11,6 +28,7 @@ COMMAND_ACK.fields = {
              { "target_component", "<B" },
              }
 
+-- Structure of COMMAND_LONG
 local COMMAND_LONG = {}
 COMMAND_LONG.id = 76
 COMMAND_LONG.fields = {
@@ -32,6 +50,7 @@ msg.messages = {}
 msg.messages[1] = COMMAND_ACK
 msg.messages[2]  = COMMAND_LONG
 
+-- Find the message defined above through its id
 function get_msg_message(id)
   local x = 0
   for x=1,2 do 
@@ -42,6 +61,7 @@ function get_msg_message(id)
   error("Message ID not found")
 end
 
+-- Decode the header of the message
 function decode_header(message)
   -- build up a map of the result
   local result = {}
@@ -72,6 +92,7 @@ function decode_header(message)
   return result, read_marker
 end
 
+-- Decode the message received
 function decode(message, msg_map)
   local result, offset = decode_header(message)
   local message_map = get_msg_message(result.msgid)
@@ -97,6 +118,7 @@ function decode(message, msg_map)
   return result;
 end
 
+-- Encode a message to be sent from controller
 function encode(id, message)
   local message_map = get_msg_message(id)
   if not message_map then
@@ -126,6 +148,7 @@ function encode(id, message)
   return message_map.id, string.pack(packString, table.unpack(packedTable))
 end
 
+-- message id
 local COMMAND_ACK_ID = 77
 local COMMAND_LONG_ID = 76
 
@@ -139,24 +162,21 @@ mavlink:init(1, 10)
 -- register message id to receive
 mavlink:register_rx_msgid(COMMAND_LONG_ID)
 
+-- Custom cmd of message from base station
 local MAV_CMD_WIND_DATA = 219
---local MAV_CMD_WAYPOINT_USER_1 = 31000
 
 -- Block AP parsing user1 so we can deal with it in the script
 -- Prevents "unsupported" ack
---mavlink:block_command(MAV_CMD_WAYPOINT_USER_1)
-
 function handle_command_long(cmd)
     if (cmd.command == MAV_CMD_WIND_DATA) then
-        gcs:send_text(0, "Got WIND DATA")
-
-    elseif (cmd.command == MAV_CMD_WAYPOINT_USER_1) then
-        -- return ack from command param value
-        return math.min(math.max(math.floor(cmd.param1), 0), 5)
+        -- Set wind direction and speed from the base station
+        gcs:send_text(6, "Got Base Station Data")
+        
     end
     return nil
 end
 
+-- Update function to run every second
 function update()
     local msg, chan = mavlink:receive_chan()
     if (msg ~= nil) then
@@ -166,7 +186,8 @@ function update()
             local result
             if parsed_msg.msgid == COMMAND_LONG_ID then
                 result = handle_command_long(parsed_msg)
-                gcs:send_text(6, "Wind Value " .. parsed_msg.param2)
+                wind_direction:set(parsed_msg.param1)
+                wind_speed:set(parsed_msg.param2)  
             end
 
             if (result ~= nil) then
@@ -178,7 +199,6 @@ function update()
                 ack.result_param2 = 0
                 ack.target_system = parsed_msg.sysid
                 ack.target_component = parsed_msg.compid
-
                 mavlink:send_chan(chan, encode(77, ack))
             end
         end
