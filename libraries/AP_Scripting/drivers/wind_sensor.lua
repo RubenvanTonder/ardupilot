@@ -26,15 +26,14 @@ local PARAM_TABLE_KEY = 72
 assert(param:add_table(PARAM_TABLE_KEY, "MY_", 1), 'could not add param table')
 
 -- 
-assert(param:add_param(PARAM_TABLE_KEY, 1, 'WIND_SENSOR', 10), 'could not add wind sensor')
+assert(param:add_param(PARAM_TABLE_KEY, 1, 'WIND_SENSOR', 0), 'could not add wind sensor')
 
 local param1 = Parameter("MY_WIND_SENSOR")
-gcs:send_text(0, string.format("param1=%f", param1:get()))
+gcs:send_text(6, string.format("param1=%f", param1:get()))
 
 -- function to decode data on uart
 function decode()
     local byte = port:read()
-    
     -- Convert byte from ascii to dec
     if byte == 48 then
         value_read  = 0;
@@ -75,10 +74,11 @@ function decode()
         if wind_direction > 180 then
            wind_direction = wind_direction-360;
         end
+        gcs:send_text(6,"Wind Sensor " .. wind_direction)
+        logger:write('WIND','Direct','f',tostring(wind_direction))
         if not(param:set('MY_WIND_SENSOR',(wind_direction))) then
             gcs:send_text(6, 'LUA: param set failed');
           end
-        gcs:send_text(6,(wind_direction))
         wind_direction = 0;
     elseif tens then 
         update_param = true;
@@ -92,28 +92,9 @@ function decode()
     elseif byte == 68 then
         flag_D = true;
     end
-    
-    return decode, 100
+    return decode, 200
 end
 
--- functions to calibrate wind sensor
-function calibrate_send()
-    port:write("1")
-    gcs:send_text(6,"Calibrate Send: 1")
-    return calibrate_receive, 1000
-end
-
-function calibrate_receive()
-    local byte = port:read()
-    gcs:send_text(6,"Waiting for wind sensor")
-    gcs:send_text(6,byte)
-    if byte == 49 then 
-        gcs:send_text(6,"Decoding")
-        return decode, 500
-    end
-
-    return calibrate_receive, 500
-end
 -- the main update function that is used to check for serial prt
 function update()
 
@@ -121,7 +102,8 @@ function update()
         gcs:send_text(6, "no Scripting Serial Port")
         return update, 1000
     else
-        return calibrate_send, 1000
+        --port:write(1)
+        return decode, 1000
     end
 
     return update, 1000

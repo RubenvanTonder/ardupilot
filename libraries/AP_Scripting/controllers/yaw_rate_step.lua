@@ -52,28 +52,6 @@ local function constrain(v, vmin, vmax)
    return v
 end
 
--- Flip heading from 0 - 2pi to -pi - pi
-local function flipheadingtoPi(h)
-   if h < -math.pi then
-      h = h + 2*math.pi
-   end
-   if h > math.pi then
-      h = h - 2*math.pi
-   end
-   return h
-end
-
--- Flip heading from -pi - pi to -2pi - 2pi
-local function flipheading(h)
-   if h < -math.pi then
-      h = h + 2*math.pi
-   end
-   if h > math.pi then
-      h = h - 2*math.pi
-   end
-   return h
-end
-
 local previous_heading = 0.0
 local current_heading = 0.0
 local previous_desired_heading = 0.0
