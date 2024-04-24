@@ -160,13 +160,19 @@ local desired_heading = Parameter()
 if not desired_heading:init('PTHCTL_Heading') then
   gcs:send_text(6, 'get PTHCTL_Heading failed')
 end
- local rudder_out = 0
- local STRCTL_ENABLE = 0
- local AUX_FUNCTION_NUM = 300
-function update()
 
+local rudder_out = 0
+local STRCTL_ENABLE = 0
+local AUX_FUNCTION_NUM = 300
+local rudder_pwm
+function set_servo()
+   SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
+end
+
+function update()
+   --gcs:send_text(MAV_SEVERITY_INFO,rc:get_aux_cached(AUX_FUNCTION_NUM))
    -- Initialize PI Controler Values to zero
-   if rc:get_aux_cached(AUX_FUNCTION_NUM) == 1 then
+   if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
       gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
       -- Initialize PI Controller
@@ -212,7 +218,7 @@ function update()
       logger.write("STRD",'DesYaw,Yaw,PrevYaw,Rudder','ffff',desired_yaw,current_heading,previous_heading,rudder_pwm)
       if STRCTL_THR_CHAN:get() > 0 then
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
-         SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
+         local succes, err = pcall(set_servo)
       end
    end
 end
@@ -225,10 +231,10 @@ end
    local success, err = pcall(update)
    if not success then
       gcs:send_text(MAV_SEVERITY_EMERGENCY, "Internal Error: " .. err)
+      servo_function:set(servo_Original)
       -- when we fault we run the update function again after 1s, slowing it
       -- down a bit so we don't flood the console with errors
-      --return protected_wrapper, 1000
-      return
+      return protected_wrapper, 1000
    end
    return protected_wrapper, 1000/UPDATE_RATE_HZ
  end

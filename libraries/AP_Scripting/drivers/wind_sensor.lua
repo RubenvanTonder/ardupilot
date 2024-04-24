@@ -74,7 +74,7 @@ function decode()
         if wind_direction > 180 then
            wind_direction = wind_direction-360;
         end
-        gcs:send_text(6,"Wind Sensor " .. wind_direction)
+        --gcs:send_text(6,"Wind Sensor " .. wind_direction)
         logger:write('WIND','Direct','f',tostring(wind_direction))
         if not(param:set('MY_WIND_SENSOR',(wind_direction))) then
             gcs:send_text(6, 'LUA: param set failed');

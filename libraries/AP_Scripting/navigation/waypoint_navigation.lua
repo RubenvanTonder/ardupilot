@@ -86,7 +86,6 @@ local function circle_of_acceptance(current, target_waypoint)
     local y =  distance:y()
     local distance = math.sqrt(x^2 + y^2)
     local in_track_distance = math.cos(track_heading_angle) * x + math.sin(track_heading_angle) * y
-   -- print("in track distance" .. in_track_distance)
     if distance < radius_of_acceptance  then
         gcs:send_text(6,"Sailboat Within Radius of Acceptance")
         return true
@@ -144,16 +143,13 @@ local function tack()
     -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
     local wind_angle_radians = math.rad(wind_dir:get())
     apparent_wind_angle = -wind_angle_radians + math.abs(track_heading_angle)
-    --print("Apparent Wind Angle " .. apparent_wind_angle)
     if math.abs(apparent_wind_angle) < no_go_zone then
-        --print("Tack Required")
+
         tacking = 1
                 
         -- Perform tack right
         if tack_right then 
             track_heading_angle = wind_angle_radians + tack_heading
-            --print("Desired Heading Angle " .. track_heading_angle)
-            --print("Tack Right")
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e > max_tack_distance then
                 tack_right = false
@@ -162,11 +158,9 @@ local function tack()
             -- Perform tack left
         else
             track_heading_angle = wind_angle_radians - tack_heading
-            --print("Desired Heading Angle " .. track_heading_angle)
-            --print("Tack Left")
+
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e < -max_tack_distance then
-                --print("Switch Tack")
                 tack_right = true
                 track_heading_angle = wind_angle_radians + tack_heading
             end
@@ -245,7 +239,6 @@ function UPDATE()
                 current_waypoint = current_waypoint + 1
                 waypoint_reached = false
                 if current_waypoint == waypoint.total then
-                    print("Final waypoint reached")
                     return UPDATE()
                 end
             end

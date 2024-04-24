@@ -171,27 +171,21 @@ end
  local AUX_FUNCTION_NUM = 300
  local aux_changed = false
  local x_h
-
+local start = false
 function update()
 
-   local aux_pos = rc:get_aux_cached(AUX_FUNCTION_NUM)
-   if aux_pos ~= LAST_AUX_POS then
-      LAST_AUX_POS = aux_pos
-      aux_changed = not(aux_changed)
-      gcs:send_text(MAV_SEVERITY_INFO, string.format("Aux set to %u", aux_pos))
-   end
-
    -- Initialize PI Controler Values to zero
-   if aux_changed and STRCTL_ENABLE == 0 then
+   if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
       gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
-      x_h = ahrs:get_yaw() + math.pi/6
       -- Initialize PI Controller
       servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
-      delay()
-   end
-   if not(aux_changed)  then
+      if not false then
+         x_h = ahrs:get_yaw() -math.pi/6
+         start = true
+      end
+   else
       STRCTL_ENABLE = 0
       servo_function:set(servo_Original)
       SRV_Channels:set_output_pwm(94,1500)
@@ -241,7 +235,7 @@ function update()
       if STRCTL_THR_CHAN:get() > 0 then
          --gcs:send_text(MAV_SEVERITY_INFO,"Servo Output")
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
-         SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
+         local succes, err = pcall(SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm)))
       end
    end
 end
@@ -253,6 +247,7 @@ end
  function protected_wrapper()
    local success, err = pcall(update)
    if not success then
+      servo_function:set(servo_Original)
       gcs:send_text(MAV_SEVERITY_EMERGENCY, "Internal Error: " .. err)
       -- when we fault we run the update function again after 1s, slowing it
       -- down a bit so we don't flood the console with errors
