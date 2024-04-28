@@ -188,7 +188,10 @@ local function update()
       x_d = x_p:get() - beta
       --print("Desired Tack Heading " .. x_d)
     end
-    desired_heading:set(x_d)
+    
+    if not desired_heading:set(x_d) then
+      gcs:send_text(6, string.format('Desired heading set failed'))
+   end
 
     --print("Beta " .. beta)
    -- print("Track Heading "  .. x_p:get())

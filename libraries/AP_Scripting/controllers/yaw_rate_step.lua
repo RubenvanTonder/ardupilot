@@ -6,7 +6,7 @@
 
 
 
-UPDATE_RATE_HZ = 25
+UPDATE_RATE_HZ = 15
 
 -- select the servo powering the rudder
 local servo_function = Parameter()
@@ -172,6 +172,11 @@ end
  local aux_changed = false
  local x_h
 local start = false
+local rudder_pwm
+function set_servo()
+   SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
+end
+
 function update()
 
    -- Initialize PI Controler Values to zero
@@ -181,8 +186,8 @@ function update()
       -- Initialize PI Controller
       servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
-      if not false then
-         x_h = ahrs:get_yaw() -math.pi/6
+      if not start then
+         x_h = ahrs:get_yaw()+math.pi/6
          start = true
       end
    else
@@ -235,7 +240,14 @@ function update()
       if STRCTL_THR_CHAN:get() > 0 then
          --gcs:send_text(MAV_SEVERITY_INFO,"Servo Output")
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
-         local succes, err = pcall(SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm)))
+         local succes, err = pcall(set_servo)
+         if not success then
+            gcs:send_text(MAV_SEVERITY_EMERGENCY, "Servo set error: " .. err)
+            servo_function:set(servo_Original)
+            -- when we fault we run the update function again after 1s, slowing it
+            -- down a bit so we don't flood the console with errors
+            return update, 1000/UPDATE_RATE_HZ
+         end
       end
    end
 end
@@ -251,8 +263,8 @@ end
       gcs:send_text(MAV_SEVERITY_EMERGENCY, "Internal Error: " .. err)
       -- when we fault we run the update function again after 1s, slowing it
       -- down a bit so we don't flood the console with errors
-      --return protected_wrapper, 1000
-      return
+      return protected_wrapper, 1000
+      --return
    end
    return protected_wrapper, 1000/UPDATE_RATE_HZ
  end

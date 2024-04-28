@@ -21,7 +21,7 @@ local max_tack_distance = 10.0
 local tack_heading = math.pi/4
 local no_go_zone = math.pi/4
 local tacking = 0
-local going_home
+local going_home = false
 local radius_of_acceptance = 5
 -- current location of the sailboat
 local current_location
@@ -51,6 +51,7 @@ waypoint.mission = {Location(), Location()}
 local current_waypoint = 1
 local loaded = false
 local waypoint_reached = false
+local waypoint_passed = flse
 
 -- Time keeping for logging at different dates
 
@@ -80,17 +81,30 @@ local function load_waypoints()
 end
 
 -- Calculate if waypoint has been reached
+local function passed_waypoint()
+    local src_dest
+    if not going_home then
+        src_dest = waypoint.mission[current_waypoint]:get_distance_NE(waypoint.mission[current_waypoint-1])
+    else
+        src_dest = waypoint.mission[waypoint.total-1]:get_distance_NE(waypoint.mission[0])
+    end
+    local x = src_dest:x()
+    local y = src_dest:y()
+    distance = math.sqrt(x*x + y*y)
+    if (distance-l_track) < 0 then
+        gcs:send_text(6,"Sailboat passed waypoint")
+        return true
+    else 
+        return false
+    end
+end
 local function circle_of_acceptance(current, target_waypoint)
     local distance = current:get_distance_NE(target_waypoint)
-  local x = distance:x()
-    local y =  distance:y()
+    local x = distance:x()
+    local y = distance:y()
     local distance = math.sqrt(x^2 + y^2)
-    local in_track_distance = math.cos(track_heading_angle) * x + math.sin(track_heading_angle) * y
     if distance < radius_of_acceptance  then
         gcs:send_text(6,"Sailboat Within Radius of Acceptance")
-        return true
-    elseif (in_track_distance) < 0 then
-       gcs:send_text(6,"Sailboat passed waypoint")
         return true
     else 
         return false
@@ -233,15 +247,7 @@ function UPDATE()
                 current_location = last_location
             end
 
-            -- Check if waypoint has been reached
-            waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[current_waypoint])
-            if waypoint_reached then
-                current_waypoint = current_waypoint + 1
-                waypoint_reached = false
-                if current_waypoint == waypoint.total then
-                    return UPDATE()
-                end
-            end
+            
 
             -- Calculate the bearing and length between source and destination waypoint
             bearing_and_length_to_waypoint(waypoint.mission[current_waypoint], waypoint.mission[current_waypoint-1])
@@ -249,16 +255,53 @@ function UPDATE()
             -- Get distance along the track and cross-track error between home and waypoint 1
             guidance_axis_calc(current_location, waypoint.mission[current_waypoint-1])
 
+            -- Check if waypoint has been reached
+            waypoint_passed = passed_waypoint()
+            waypoint_reached = circle_of_acceptance(current_location,waypoint.mission[current_waypoint])
+            if waypoint_reached or waypoint_passed then
+                current_waypoint = current_waypoint + 1
+                waypoint_reached = false
+                if current_waypoint == waypoint.total then
+                    return UPDATE()
+                end
+            end
+
             -- Check if tack is required
             --tack()
 
         else 
             --Heading Home
             going_home = true
+            gcs:send_text(6, "Going Home")
+            -- Update Current Position
             -- Update Current Position
             if (gps:num_sats(0) > 6) then
+                -- Save current location
                 current_location = ahrs:get_location()
+
+                -- Update counter so that oldest sample of location is swopped out with newest
+                if location_counter == 4 then
+                   location_counter = 0 
+                elseif location_counter == 1 then
+                    location1:lat(current_location:lat())
+                    location1:lng(current_location:lng())
+                elseif location_counter == 2 then
+                    location2:lat(current_location:lat())
+                    location2:lng(current_location:lng())
+                elseif location_counter == 3 then
+                    location3:lat(current_location:lat())
+                    location3:lng(current_location:lng())
+                end
+                location_counter = location_counter +1
+                -- Get the average movement of the last three locations
+                local lat_avg = location1:lat()/3 + location2:lat()/3 + location3:lat()/3
+                local lng_avg = location1:lng()/3 + location2:lng()/3 + location3:lng()/3
+                current_location:lat(lat_avg)
+                current_location:lng(lng_avg)
+
+                -- Save current location as last active location
                 last_location = current_location
+                
             else 
                 current_location = last_location
             end
@@ -272,8 +315,10 @@ function UPDATE()
             --tack()
 
             -- Check if waypoint has been reached
+            waypoint_passed = passed_waypoint()
             waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[0])
-            if waypoint_reached then
+
+            if waypoint_reached or waypoint_passed then
                 current_waypoint = 1;
                 waypoint_reached = false
             end
