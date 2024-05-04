@@ -164,33 +164,35 @@ local function update()
 
    if arming:is_armed() then
 
-    -- Find the actual heading angle 
-    -- Check if tacking is required
-    --LOS Vector
-    local body_to_earth = Vector3f()
-    body_to_earth = ahrs:get_velocity_NED()
-    local yaw = ahrs:get_yaw()
-    local roll = ahrs:get_roll()
-    local vex = body_to_earth:x()
-    local vey = body_to_earth:y()
+      -- Find the actual heading angle 
+      -- Check if tacking is required
+      --LOS Vector
+      local body_to_earth = Vector3f()
+      body_to_earth = ahrs:get_velocity_NED()
+      local yaw = ahrs:get_yaw()
+      local roll = ahrs:get_roll()
+      local vex = body_to_earth:x()
+      local vey = body_to_earth:y()
 
-    vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
-    vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
-    beta = math.asin(vby/vbx)
-    beta = constrain(beta,-0.2,0.2)
+      vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
+      vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
+      -- Check if vbx ~= 0 
+      if vbx~=0 then
+         beta = math.asin(constrain(vby/vbx,-0.5,0.5))
+      else
+         beta=a
+      end
+      if tack:get() == 0 then
+        x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
+        x_d = x_p:get() - x_r - beta
+        x_d = x_d 
+      else 
+        x_d = x_p:get() - beta
+        --print("Desired Tack Heading " .. x_d)
+      end
 
-    if tack:get() == 0 then
-      x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
-      x_d = x_p:get() - x_r - 
-      beta
-      x_d = x_d 
-    else 
-      x_d = x_p:get() - beta
-      --print("Desired Tack Heading " .. x_d)
-    end
-    
-    if not desired_heading:set(x_d) then
-      gcs:send_text(6, string.format('Desired heading set failed'))
+      if not desired_heading:set(x_d) then
+        gcs:send_text(6, string.format('Desired heading set failed'))
    end
 
     --print("Beta " .. beta)

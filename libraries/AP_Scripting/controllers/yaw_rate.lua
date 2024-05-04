@@ -216,7 +216,7 @@ function update()
    
       rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
       last_pwm = rudder_pwm
-      logger.write("STRD",'DesYaw,Yaw,PrevYaw,Rudder','ffff',desired_yaw,current_heading,previous_heading,rudder_pwm)
+      logger.write("STRD",'DesYaw,Yaw,Rudder','fff',desired_yaw,current_heading,rudder_pwm)
       if STRCTL_THR_CHAN:get() > 0 then
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
          local succes, err = pcall(set_servo)
