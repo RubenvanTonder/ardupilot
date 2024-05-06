@@ -7,19 +7,13 @@ local function delay()
 end
 delay()
 UPDATE_RATE_HZ = 10
--- Create param to mimic global variables
-local PARAM_TABLE_KEY1 = 74
-assert(param:add_table(PARAM_TABLE_KEY1, "Nv_", 5), 'could not add param table')
-assert(param:add_param(PARAM_TABLE_KEY1, 1, 'Heading', 0.0), 'could not add param1')
-assert(param:add_param(PARAM_TABLE_KEY1, 2, 'Crosstrack', 0.0), 'could not add param2')
-assert(param:add_param(PARAM_TABLE_KEY1, 3, 'Tack_Heading', 0.0), 'could not add param3')
-assert(param:add_param(PARAM_TABLE_KEY1, 4, 'Tack', 0.0), 'could not add param3')
 
--- setup a parameter block
+-- Create parameter table for path following control
 local PARAM_TABLE_KEY = 75
 local PARAM_TABLE_PREFIX = 'PTHCTL_'
 assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 5), 'could not add param table')
 assert(param:add_param(PARAM_TABLE_KEY, 4, 'Heading', 0.0), 'could not add param1')
+
 -- gcs messages
 local MAV_SEVERITY_INFO = 6
 local MAV_SEVERITY_NOTICE = 5

@@ -1,21 +1,49 @@
 -- Script for navigating between waypoints
 
+--Update Rate
+UPDATE_RATE_HZ = 1
+
 -- Global parameters
 local table_track_heading =  Parameter("Nv_Heading")
 local table_cross_track =  Parameter("Nv_Crosstrack")
 local tack_heading = Parameter('Nv_Tack_Heading')
 local tack_require = Parameter('Nv_Tack')
 
--- Get the wind direction
--- for fast param acess it is better to get a param object,
--- this saves the code searching for the param by name every time
-local wind_dir = Parameter()
-if not wind_dir:init('SIM_WIND_DIR') then
+-- Get the data from onboard wind sensor
+local wnd_onboard = Parameter()
+if not wnd_onboard:init('WND_Onboard') then
+  gcs:send_text(6, 'get WND_Onboard failed')
+end
+
+-- Get the data from weather station wind direction
+local wnd_direction = Parameter()
+if not wnd_direction:init('WND_Direction') then
+  gcs:send_text(6, 'get WND_Direction failed')
+end
+
+-- Get the wind direction for simulation
+local sim_wind_direction = Parameter()
+if not sim_wind_direction:init('SIM_WIND_DIR') then
   gcs:send_text(6, 'get SIM_WIND_DIR failed')
 end
 
+-- Get the data from weather station wind speed
+local wnd_speed = Parameter()
+if not wnd_speed:init('WND_Speed') then
+  gcs:send_text(6, 'get WND_Speed failed')
+end
+
+-- Get settings for what wind sensing to follow
+-- 0 = onboard wind sensor 
+-- 1 = weather station wind data
+-- else = simulation wind value = 180(default)
+local nv_wind = Parameter()
+if not nv_wind:init('Nv_Wind') then
+  gcs:send_text(6, 'get Nv_wind failed')
+end
+
 -- Tacking and Indirect waypoint approach
-local apparent_wind_angle
+local apparent_wind_angle = 0.0
 local tack_right = true
 local max_tack_distance = 10.0
 local tack_heading = math.pi/4
@@ -23,6 +51,7 @@ local no_go_zone = math.pi/4
 local tacking = 0
 local going_home = false
 local radius_of_acceptance = 5
+
 -- current location of the sailboat
 local current_location
 local last_location
@@ -195,6 +224,14 @@ function UPDATE()
         return UPDATE, 1000
     end 
 
+    local wind_settings = nv_wind:get()
+    if wind_settings == 0 then 
+        gcs:send_text(6, "Wind Value: " .. wnd_onboard:get())
+    elseif wind_settings == 1 then
+        gcs:send_text(6, "Wind Value: " .. wnd_direction:get())
+    else 
+        gcs:send_text(6, "Wind Value: " .. sim_wind_direction:get())
+    end
     -- Wait for sailboat to be armed
     if arming:is_armed()then      
         
@@ -336,7 +373,7 @@ function UPDATE()
             gcs:send_text(6,"Could not update crosstrack error to table")
         end
     end
-    return UPDATE, 250
+    return UPDATE, 1000/UPDATE_RATE_HZ
 end
 
 return UPDATE()

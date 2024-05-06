@@ -1,11 +1,6 @@
 --[[
    PI Controller used for testing the controller design of the rudder
 --]]
-
-
-
-
-
 UPDATE_RATE_HZ = 10
 
 -- select the servo powering the rudder
@@ -76,9 +71,6 @@ STRCTL_RC_FUNC  = bind_add_param('RC_FUNC',  8, 300)
 
 -- output servo channel that we will control
 STRCTL_THR_CHAN = bind_add_param('THR_CHAN', 9, 1)
-
--- battery index to monitor, 0 is first battery
-STRCTL_BAT_IDX  = bind_add_param('BAT_IDX', 10, 0)
 
 -- maximum slew rate in percent/second for throttle change
 STRCTL_SLEW_RATE = bind_add_param('SLEW_RATE', 12, 100)
@@ -216,7 +208,7 @@ function update()
    
       rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
       last_pwm = rudder_pwm
-      logger.write("STRD",'DesYaw,Yaw,PrevYaw,Rudder','ffff',desired_yaw,current_heading,previous_heading,rudder_pwm)
+      logger.write("STRD",'DesYaw,Yaw,Rudder','fff',desired_yaw,current_heading,rudder_pwm)
       if STRCTL_THR_CHAN:get() > 0 then
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
          local succes, err = pcall(set_servo)
