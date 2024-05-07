@@ -179,6 +179,7 @@ function update()
                 if not direction:set(dir) then
                   gcs:send_text(6, string.format('Wind Direction set failed'))
                 end
+                gcs:send_text(6,"Weather Station data received")
             end
 
             if (result ~= nil) then

@@ -146,7 +146,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     -- log the controller internals
     function self.log(name)
        -- allow for an external addition to total
-       logger.write(name,'Error,P,I,Total,xr','fffff',_err,_P,_I,_total,-x_r)
+       logger:write(name,'Error,P,I,Total,xr','fffff',_err,_P,_I,_total,-x_r)
     end
  
     -- return the instance
@@ -174,7 +174,7 @@ local function update()
       if vbx~=0 then
          beta = math.asin(constrain(vby/vbx,-0.5,0.5))
       else
-         beta=a
+         beta=0
       end
       if tack:get() == 0 then
         x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
@@ -187,7 +187,7 @@ local function update()
 
       if not desired_heading:set(x_d) then
         gcs:send_text(6, string.format('Desired heading set failed'))
-   end
+      end
 
     --print("Beta " .. beta)
    -- print("Track Heading "  .. x_p:get())
@@ -195,7 +195,7 @@ local function update()
     --print("Combined Heading "  .. x_d)
     -- Log path following controller data
     PTH_PI.log("PTHC")
-    logger.write("BXY",'Beta,BodyX,BodyY','fff',beta,vbx,vby)
+    logger:write("BXY",'Beta,BodyX,BodyY','fff',beta,vbx,vby)
    end
 end
  

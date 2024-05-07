@@ -15,5 +15,5 @@ assert(param:add_param(PARAM_TABLE_KEY1, 5, 'Wind', 0), 'could not add param3')
 local PARAM_TABLE_KEY2 = 77
 assert(param:add_table(PARAM_TABLE_KEY2, "WND_", 4), 'could not add param table for wind')
 assert(param:add_param(PARAM_TABLE_KEY2, 1, 'Onboard', 0.0), 'could not add onboard wind data')
-assert(param:add_param(PARAM_TABLE_KEY2, 2, 'Direction', 0.0), 'could not add wind direction data')
+assert(param:add_param(PARAM_TABLE_KEY2, 2, 'Direction', 90.0), 'could not add wind direction data')
 assert(param:add_param(PARAM_TABLE_KEY2, 3, 'Speed', 0.0), 'could not add wind speed data')

@@ -27,6 +27,12 @@ if not sim_wind_direction:init('SIM_WIND_DIR') then
   gcs:send_text(6, 'get SIM_WIND_DIR failed')
 end
 
+-- Get the wind direction for simulation
+local sim_wind_speed = Parameter()
+if not sim_wind_speed:init('SIM_WIND_SPD') then
+  gcs:send_text(6, 'get SIM_WIND_SPD failed')
+end
+
 -- Get the data from weather station wind speed
 local wnd_speed = Parameter()
 if not wnd_speed:init('WND_Speed') then
@@ -42,8 +48,13 @@ if not nv_wind:init('Nv_Wind') then
   gcs:send_text(6, 'get Nv_wind failed')
 end
 
--- Tacking and Indirect waypoint approach
+-- Wind data
 local apparent_wind_angle = 0.0
+local wind_direction = 0
+local wind_speed = 0
+local on_board = 0
+
+-- Tacking and Indirect waypoint approach
 local tack_right = true
 local max_tack_distance = 10.0
 local tack_heading = math.pi/4
@@ -169,6 +180,7 @@ end
 
 local function write_to_dataflash()
     logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
+    logger:write('NAV2','direction,speed,onboard','fff',wind_direction,wind_speed,on_board)
     if going_home then
         logger:write('NAV1','N,E,Ns,Es','ffff',tostring(0),tostring(0),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):x()),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):y()))
     else
@@ -225,12 +237,25 @@ function UPDATE()
     end 
 
     local wind_settings = nv_wind:get()
+    on_board = math.rad(wnd_onboard:get())
+    wind_speed = wnd_speed:get()
+    wind_direction = math.rad(wnd_direction:get())
+    -- Onboard wind sensor
     if wind_settings == 0 then 
-        gcs:send_text(6, "Wind Value: " .. wnd_onboard:get())
+        apparent_wind_angle = on_board
+        gcs:send_text(6, "AWA " .. apparent_wind_angle)
+
+    -- Weather Station wind direction and speed
     elseif wind_settings == 1 then
-        gcs:send_text(6, "Wind Value: " .. wnd_direction:get())
+        apparent_wind_angle = ahrs:get_yaw() - wind_direction
+        gcs:send_text(6, "AWA " .. apparent_wind_angle)
+
+    -- Simulation Weather Data
     else 
-        gcs:send_text(6, "Wind Value: " .. sim_wind_direction:get())
+        wind_direction = math.rad(sim_wind_direction:get())
+        wind_speed = sim_wind_speed:get()
+        apparent_wind_angle = ahrs:get_yaw() - wind_direction
+        gcs:send_text(6, "AWA " .. apparent_wind_angle)
     end
     -- Wait for sailboat to be armed
     if arming:is_armed()then      
