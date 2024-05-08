@@ -1,4 +1,7 @@
--- Reads data in from UART and logs to dataflash
+--[
+    -- Script for reading data from uart for the onboard wind sensor
+--]
+
 
 -- find the serial first (0) scripting serial port instance
 local port = serial:find_serial(0)
@@ -23,13 +26,10 @@ port:set_flow_control(0)
 local PARAM_TABLE_KEY = 72
 
 -- add a new parameter table for wind sensor
-assert(param:add_table(PARAM_TABLE_KEY, "MY_", 1), 'could not add param table')
-
--- 
-assert(param:add_param(PARAM_TABLE_KEY, 1, 'WIND_SENSOR', 0), 'could not add wind sensor')
-
-local param1 = Parameter("MY_WIND_SENSOR")
-gcs:send_text(6, string.format("param1=%f", param1:get()))
+local on_board = Parameter()
+if not on_board:init('WND_Onboard') then
+  gcs:send_text(6, 'get WND_Onboard failed')
+end
 
 -- function to decode data on uart
 function decode()
@@ -74,10 +74,8 @@ function decode()
         if wind_direction > 180 then
            wind_direction = wind_direction-360;
         end
-        --gcs:send_text(6,"Wind Sensor " .. wind_direction)
-        logger:write('WIND','Onboard','f',tostring(wind_direction))
-        if not(param:set('MY_WIND_SENSOR',(wind_direction))) then
-            gcs:send_text(6, 'LUA: param set failed');
+        if not(on_board:set(wind_direction)) then
+            gcs:send_text(6, 'Onboard set failed');
           end
         wind_direction = 0;
     elseif tens then 

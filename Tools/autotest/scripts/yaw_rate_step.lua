@@ -1,7 +1,12 @@
 --[[
    PI Controller used for testing the controller design of the rudder
 --]]
-UPDATE_RATE_HZ = 10
+
+
+
+
+
+UPDATE_RATE_HZ = 15
 
 -- select the servo powering the rudder
 local servo_function = Parameter()
@@ -47,11 +52,17 @@ local function constrain(v, vmin, vmax)
    return v
 end
 
-
 local previous_heading = 0.0
 local current_heading = 0.0
 local previous_desired_heading = 0.0
 local desired_yaw = 0.0
+
+
+local function delay()
+   
+   return update, 250
+end
+
 
 
 -- MIN, MAX and IDLE PWM for throttle output
@@ -71,6 +82,9 @@ STRCTL_RC_FUNC  = bind_add_param('RC_FUNC',  8, 300)
 
 -- output servo channel that we will control
 STRCTL_THR_CHAN = bind_add_param('THR_CHAN', 9, 1)
+
+-- battery index to monitor, 0 is first battery
+STRCTL_BAT_IDX  = bind_add_param('BAT_IDX', 10, 0)
 
 -- maximum slew rate in percent/second for throttle change
 STRCTL_SLEW_RATE = bind_add_param('SLEW_RATE', 12, 100)
@@ -138,7 +152,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     -- log the controller internals
     function self.log(name)
        -- allow for an external addition to total
-       logger:write(name,'Targ,Curr,P,I,Total','fffff',_target,_current,_P,_I,_total)
+       logger.write(name,'Targ,Curr,P,I,Total','fffff',_target,_current,_P,_I,_total)
     end
  
     -- return the instance
@@ -152,10 +166,12 @@ local desired_heading = Parameter()
 if not desired_heading:init('PTHCTL_Heading') then
   gcs:send_text(6, 'get PTHCTL_Heading failed')
 end
-
-local rudder_out = 0
-local STRCTL_ENABLE = 0
-local AUX_FUNCTION_NUM = 300
+ local rudder_out = 0
+ local STRCTL_ENABLE = 0
+ local AUX_FUNCTION_NUM = 300
+ local aux_changed = false
+ local x_h
+local start = false
 local rudder_pwm
 function set_servo()
    SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
@@ -163,14 +179,18 @@ function set_servo()
 end
 
 function update()
-   --gcs:send_text(MAV_SEVERITY_INFO,rc:get_aux_cached(AUX_FUNCTION_NUM))
+
    -- Initialize PI Controler Values to zero
    if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
-     -- gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
+      gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
       -- Initialize PI Controller
       servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
+      if not start then
+         x_h = ahrs:get_yaw()+math.pi/6
+         start = true
+      end
    else
       STRCTL_ENABLE = 0
       servo_function:set(servo_Original)
@@ -186,7 +206,11 @@ function update()
 
       -- Get desired heading
       -- path following contrller or tacking controller
-      desired_yaw = desired_heading:get()
+      --desired_yaw = desired_heading:get()
+
+      -- Step response
+      desired_yaw = x_h
+      gcs:send_text(6, "Desired Yaw " .. x_h)
 
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
       if (previous_heading - current_heading) < -math.pi then
@@ -194,6 +218,12 @@ function update()
       elseif (previous_heading - current_heading) > math.pi then
          current_heading = current_heading + 2 * math.pi
       end
+       -- Change desired yaw from -pi - pi  to -2*pi - 2*pi
+      --if (previous_desired_heading - desired_yaw) < -math.pi then
+      --   desired_yaw = desired_yaw - 2 * math.pi
+      --elseif (previous_desired_heading - desired_yaw) > math.pi then
+      --   desired_yaw = desired_yaw + 2 * math.pi
+      --end
 
       previous_heading = current_heading
       rudder_out = STR_PI.update(desired_yaw, current_heading)
@@ -208,10 +238,16 @@ function update()
    
       rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
       last_pwm = rudder_pwm
-      logger:write("STRD",'DesYaw,Yaw,Rudder','fff',desired_yaw,current_heading,rudder_pwm)
+      logger.write("STRD",'DesYaw,Yaw,PrevYaw,Rudder','ffff',desired_yaw,current_heading,previous_heading,rudder_pwm)
       if STRCTL_THR_CHAN:get() > 0 then
+         --gcs:send_text(MAV_SEVERITY_INFO,"Servo Output")
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
-         local succes, err = pcall(set_servo)
+         --local succes, err = pcall(set_servo)
+         local success, err = pcall(set_servo)
+         if not success then
+            gcs:send_text(MAV_SEVERITY_EMERGENCY, "Servo set error: " )
+            return update, 1000/UPDATE_RATE_HZ
+         end
       end
    end
 end
@@ -223,16 +259,17 @@ end
  function protected_wrapper()
    local success, err = pcall(update)
    if not success then
-      gcs:send_text(MAV_SEVERITY_EMERGENCY, "Internal Error: ")
       servo_function:set(servo_Original)
+      gcs:send_text(MAV_SEVERITY_EMERGENCY, "Internal Error: " .. err)
       -- when we fault we run the update function again after 1s, slowing it
       -- down a bit so we don't flood the console with errors
       return protected_wrapper, 1000
+      --return
    end
    return protected_wrapper, 1000/UPDATE_RATE_HZ
  end
  
- gcs:send_text(MAV_SEVERITY_INFO,"Loaded gen_control.lua")
+ gcs:send_text(MAV_SEVERITY_INFO,"Step Input Loaded.lua")
  
  -- start running update loop
  return protected_wrapper()
