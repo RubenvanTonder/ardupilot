@@ -64,7 +64,7 @@ STRCTL_PID_P = bind_add_param('PID_P', 5, 0.67)
 STRCTL_PID_I = bind_add_param('PID_I', 6, 0.33)
 
 -- maximum I contribution
-STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 0.25)
+STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 0.3)
 
 -- RCn_OPTION value for 3 position switch
 STRCTL_RC_FUNC  = bind_add_param('RC_FUNC',  8, 300)
@@ -87,7 +87,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     local _iMax = iMax
     local _min = min
     local _max = max
-    local _last_t = nil
+    local _last_t = millis():tofloat() * 0.001
     local _I = 0
     local _P = 0
     local _total = 0
@@ -98,12 +98,7 @@ local function PI_controller(kP,kI,iMax,min,max)
  
     -- update the controller.
     function self.update(target, current)
-       local now = millis():tofloat() * 0.001
-       if not _last_t then
-          _last_t = now
-       end
-       local dt = now - _last_t
-       _last_t = now
+       local dt = 1000/UPDATE_RATE_HZ * 0.001
 
        -- Get the desired yaw rate
        local desired_yaw = target - current
@@ -189,11 +184,11 @@ function update()
       desired_yaw = desired_heading:get()
 
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
-      if (previous_heading - current_heading) < -math.pi then
-         current_heading = current_heading - 2 * math.pi
-      elseif (previous_heading - current_heading) > math.pi then
-         current_heading = current_heading + 2 * math.pi
-      end
+      --if (previous_heading - current_heading) < -math.pi then
+      --   current_heading = current_heading - 2 * math.pi
+      --elseif (previous_heading - current_heading) > math.pi then
+      --   current_heading = current_heading + 2 * math.pi
+      --end
 
       previous_heading = current_heading
       rudder_out = STR_PI.update(desired_yaw, current_heading)

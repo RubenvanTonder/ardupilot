@@ -162,10 +162,7 @@ local function PI_controller(kP,kI,iMax,min,max)
 
  local last_pwm = STRCTL_PWM_MIN:get()
  -- Find the desired heading angle
-local desired_heading = Parameter()
-if not desired_heading:init('PTHCTL_Heading') then
-  gcs:send_text(6, 'get PTHCTL_Heading failed')
-end
+
  local rudder_out = 0
  local STRCTL_ENABLE = 0
  local AUX_FUNCTION_NUM = 300
