@@ -77,6 +77,7 @@ private:
     float turning_circle;       // vehicle minimum turning circle diameter in meters
     
     float starting_sail_angle = 30.0f; //starting sail angle for winch controlled sail
+    int main_sail_angle =  60.0f; //starting angle of the main sail
     float current_sail_angle = starting_sail_angle; // current sail angle for winch controlled sail
     float previous_sail_angle = 30.0f; // previous sail angle for winch controlled sail
 

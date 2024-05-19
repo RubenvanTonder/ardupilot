@@ -1,14 +1,10 @@
--- Testing set_output_pwm_chan_timeout and get_output_pwm
---
--- This will set MAIN1 servo to 1700 pwm for 1 second,
--- then assigned function behavior for 1 second, and then 1100 pwm for 1 second
-
-local zigzag = true
+--[[
+    Script to perform rudder step responses
+--]]
 local K_rudder = 94
-local rudder_channel = SRV_Channels:find_channel(K_rudder)
-local yaw_angle = 0;
-local current_yaw_angle =0;
-local servoValue = 94
+local servo_Original = 26
+local servo_function = Parameter()
+servo_function:init('SERVO1_FUNCTION')
 
 --Ratio of serco output to rudder angle 0.0666 (deg/per servo step)
 -- 10 deg rudder angle = 150
@@ -24,46 +20,31 @@ local _step_6= -80
 local _step_8 = -120
 local _step_10 = -150
 
+local step_enable = 0
 
-local servoTwo_function = Parameter()
-servoTwo_function:init('SERVO9_FUNCTION')
-local servoOriginal = servoTwo_function:get()
-
-local parameterTwo = servoTwo_function:get()
-gcs:send_text(6, "SERVO9_FUNCTION= "..parameterTwo)
-
+local step_angle = _step_6
+local AUX_FUNCTION_NUM = 300
+-- Update
 function update()
-        if arming:is_armed() then
-            if  vehicle:get_mode()==0  then
-            output_pwm = SRV_Channels:get_output_pwm(K_rudder)
-            gcs:send_text(6, "Step Output "..1500+step_8)
-            SRV_Channels:set_output_pwm(K_rudder, 1500+_step_2)              
-            return update, 50
-            else
-            servoTwo_function:set(servoOriginal)
-            return start, 50
-            end
+
+      -- Initialize the rudder step
+        if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
+            gcs:send_text(6,"Step: run " ..math.floor(step_2/150*10))
+            step_enable = 1
+            -- Initialize PI Controller
+            servo_function:set(K_rudder);
         else
-            servoTwo_function:set(servoOriginal)
-            return start, 10
+            step_enable = 0
+            servo_function:set(servo_Original)
+            SRV_Channels:set_output_pwm(94,1500)
         end
-    return update, 2000
+
+        if arming:is_armed() and step_enable == 1 then
+            -- Set servo output to specific angle
+            SRV_Channels:set_output_pwm(K_rudder,1500+step_angle)
+        end
+
+    return update, 50
 end
 
-function start()
-    if arming:is_armed() then
-        if vehicle:get_mode()==0  then
-            yaw_angle = ahrs:get_yaw();
-            if yaw_angle > math.pi then
-                yaw_angle = yaw_angle - 2*math.pi
-            end
-            gcs:send_text(6, "Yaw Angle: "..yaw_angle)
-            servoTwo_function:set(K_rudder);
-            return update, 50
-        end
-        return start,50
-    end
-    return start, 50
-end
-
-return start, 100
+return update, 100

@@ -77,14 +77,8 @@ STRCTL_PID_I = bind_add_param('PID_I', 6, 0.33)
 -- maximum I contribution
 STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 0.25)
 
--- RCn_OPTION value for 3 position switch
-STRCTL_RC_FUNC  = bind_add_param('RC_FUNC',  8, 300)
-
 -- output servo channel that we will control
 STRCTL_THR_CHAN = bind_add_param('THR_CHAN', 9, 1)
-
--- battery index to monitor, 0 is first battery
-STRCTL_BAT_IDX  = bind_add_param('BAT_IDX', 10, 0)
 
 -- maximum slew rate in percent/second for throttle change
 STRCTL_SLEW_RATE = bind_add_param('SLEW_RATE', 12, 100)
@@ -109,15 +103,10 @@ local function PI_controller(kP,kI,iMax,min,max)
     local _target = 0
     local _current = 0
     local _yawrate = 0
- 
+    local dt = 1000/UPDATE_RATE_HZ * 0.001
     -- update the controller.
     function self.update(target, current)
-       local now = millis():tofloat() * 0.001
-       if not _last_t then
-          _last_t = now
-       end
-       local dt = now - _last_t
-       _last_t = now
+       
 
        -- Get the desired yaw rate
        local desired_yaw = target - current
@@ -172,20 +161,19 @@ local start = false
 local rudder_pwm
 function set_servo()
    SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
-   return 
 end
 
 function update()
 
    -- Initialize PI Controler Values to zero
    if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
-      gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
+      --gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
       -- Initialize PI Controller
       servo_function:set(K_rudder);
       STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
       if not start then
-         x_h = ahrs:get_yaw()+math.pi/6
+         x_h = ahrs:get_yaw()-math.pi/6
          start = true
       end
    else
@@ -236,14 +224,7 @@ function update()
       last_pwm = rudder_pwm
       logger.write("STRD",'DesYaw,Yaw,PrevYaw,Rudder','ffff',desired_yaw,current_heading,previous_heading,rudder_pwm)
       if STRCTL_THR_CHAN:get() > 0 then
-         --gcs:send_text(MAV_SEVERITY_INFO,"Servo Output")
-         --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
-         --local succes, err = pcall(set_servo)
-         local success, err = pcall(set_servo)
-         if not success then
-            gcs:send_text(MAV_SEVERITY_EMERGENCY, "Servo set error: " )
-            return update, 1000/UPDATE_RATE_HZ
-         end
+         pcall(set_servo)
       end
    end
 end

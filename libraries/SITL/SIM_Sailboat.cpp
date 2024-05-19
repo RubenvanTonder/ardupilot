@@ -313,10 +313,21 @@ void Sailboat::update(const struct sitl_input &input)
         // mainsail with sheet
 
         // calculate mainsail angle from servo output 4, 0 to 90 degrees
-        float mainsail_angle_bf = constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * 90.0f, 0.0f, 90.0f);
+        int sail_angle_60 = 1800;
+        int sail_angle_45 = 1700;
+        int sail_angle_30 = 1600;
+        int main_sail_pwm = input.servos[MAINSAIL_SERVO_CH];
+        if (main_sail_pwm == sail_angle_60) {
+            main_sail_angle = 60;
+        }else if (main_sail_pwm == sail_angle_45) {
+            main_sail_angle = 45;
+        }else if(main_sail_pwm == sail_angle_30) {
+            main_sail_angle = 30;
+        }
+        main_sail_angle = constrain_float(main_sail_angle,0,90);
 
         // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
-        aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - mainsail_angle_bf, 0);
+        aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - main_sail_angle, 0);
 
         if (is_negative(wind_apparent_dir_bf)) {
             // take into account the current tack
@@ -465,7 +476,7 @@ void Sailboat::update(const struct sitl_input &input)
     AP::logger().WriteStreaming("SIM4", "TimeUS,L,D,Ya,Yv,Sa",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    lift_wf, drag_wf, sway_accel, sway_rate,current_sail_angle);
+                                    lift_wf, drag_wf, sway_accel, sway_rate,main_sail_angle);
 }
 
 } // namespace SITL

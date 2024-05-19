@@ -79,6 +79,7 @@ local PTHCTL_PID_I = bind_add_param('PID_I', 2, 0.005)
 
 -- maximum I contribution
 local PTHCTL_PID_IMAX = bind_add_param('PID_IMAX', 3, 0.25)
+local script_started = true
 
 -- a PI controller implemented as a Lua object
 local function PI_controller(kP,kI,iMax,min,max)
@@ -122,7 +123,6 @@ local function PI_controller(kP,kI,iMax,min,max)
        end
        local I = _I
        local ret = P + I
- 
        _err = err
        _P = P
        _total = ret
@@ -149,25 +149,28 @@ local function update()
 
    if arming:is_armed() then
 
-      --[[
+      
       --LOS Vector
       local body_to_earth = Vector3f()
       body_to_earth = ahrs:get_velocity_NED()
       local yaw = ahrs:get_yaw()
       local roll = ahrs:get_roll()
-      local vex = body_to_earth:x()
-      local vey = body_to_earth:y()
+      local vex = gps:velocity(0):x()
+      local vey = gps:velocity(0):y()
+
+      --gcs:send_text(6, "ground speed x" .. ahrs:groundspeed_vector():x())
+      --gcs:send_text(6, "ground speed y" .. ahrs:groundspeed_vector():y())
 
       vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
       vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
       -- Check if vbx ~= 0 
-      if vbx~=0 then
+      if (vbx>0.3) then
          beta = math.asin(constrain(vby/vbx,-0.2,0.2))
          --beta=0
       else
          beta=0
       end
-      --]]
+      
       beta = 0
       if tack:get() == 0 then
         x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
@@ -184,7 +187,7 @@ local function update()
 
     -- Log path following controller data
     PTH_PI.log("PTHC")
-    --logger:write("BXY",'Beta,BodyX,BodyY','fff',beta,vbx,vby)
+    logger:write("BXY",'Beta,BodyX,BodyY,GlobalX,GlobalY','fffff',beta,vbx,vby,vex,vey)
    end
 end
  

@@ -53,7 +53,6 @@ local current_heading = 0.0
 local previous_desired_heading = 0.0
 local desired_yaw = 0.0
 
-
 -- MIN, MAX and IDLE PWM for throttle output
 STRCTL_PWM_MIN = bind_add_param('PWM_MIN', 2, 1000)
 STRCTL_PWM_MAX = bind_add_param('PWM_MAX', 3, 2000)
@@ -95,10 +94,10 @@ local function PI_controller(kP,kI,iMax,min,max)
     local _target = 0
     local _current = 0
     local _yawrate = 0
- 
+    local dt = 1000/UPDATE_RATE_HZ * 0.001
     -- update the controller.
     function self.update(target, current)
-       local dt = 1000/UPDATE_RATE_HZ * 0.001
+       
 
        -- Get the desired yaw rate
        local desired_yaw = target - current
@@ -152,20 +151,19 @@ local rudder_out = 0
 local STRCTL_ENABLE = 0
 local AUX_FUNCTION_NUM = 300
 local rudder_pwm
+STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
 function set_servo()
    SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
-   return 
 end
 
 function update()
-   --gcs:send_text(MAV_SEVERITY_INFO,rc:get_aux_cached(AUX_FUNCTION_NUM))
+   
    -- Initialize PI Controler Values to zero
    if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
      -- gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
       -- Initialize PI Controller
-      servo_function:set(K_rudder);
-      STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
+      servo_function:set(K_rudder); 
    else
       STRCTL_ENABLE = 0
       servo_function:set(servo_Original)
@@ -184,11 +182,11 @@ function update()
       desired_yaw = desired_heading:get()
 
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
-      --if (previous_heading - current_heading) < -math.pi then
-      --   current_heading = current_heading - 2 * math.pi
-      --elseif (previous_heading - current_heading) > math.pi then
-      --   current_heading = current_heading + 2 * math.pi
-      --end
+      if (previous_heading - desired_yaw) < -math.pi then
+         desired_yaw = desired_yaw - 2 * math.pi
+      elseif (previous_heading - desired_yaw) > math.pi then
+         desired_yaw = desired_yaw + 2 * math.pi
+      end
 
       previous_heading = current_heading
       rudder_out = STR_PI.update(desired_yaw, current_heading)
@@ -204,7 +202,7 @@ function update()
       rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
       last_pwm = rudder_pwm
       logger:write("STRD",'DesYaw,Yaw,Rudder','fff',desired_yaw,current_heading,rudder_pwm)
-      logger:write("ABC","x,y","ff",tostring(gps:velocity(0):x()),tostring(gps:velocity(0):y()))
+      
       if STRCTL_THR_CHAN:get() > 0 then
          --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
          local succes, err = pcall(set_servo)
