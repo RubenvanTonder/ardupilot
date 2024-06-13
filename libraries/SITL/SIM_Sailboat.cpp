@@ -230,7 +230,14 @@ void Sailboat::send_message(char msg[], float data){
 void Sailboat::update(const struct sitl_input &input)
 {
     // update wind
+    //input.wind.direction = 90.0f;
     update_wind(input);
+
+    // wind vector in earth frame
+    wind_ef_sailboat = Vector3f(cosf(radians(180.0f))*cosf(radians(0.0f)), 
+                       sinf(radians(180.0f))*cosf(radians(0.0f)), 
+                       sinf(radians(0.0f))) * 0.5f;
+    wind_ef_sailboat = -wind_ef_sailboat;
 
     // in sailboats the steering controls the rudder, the throttle controls the main sail position
     float steering = ((input.servos[STEERING_SERVO_CH]-1500)/500.0f*32.0f);
@@ -239,7 +246,8 @@ void Sailboat::update(const struct sitl_input &input)
     // calculate apparent wind in earth-frame (this is the direction the wind is coming from)
     // Note than the SITL wind direction is defined as the direction the wind is travelling to
     // This is accounted for in these calculations
-    Vector3f wind_apparent_ef = velocity_ef - wind_ef;
+    Vector3f wind_apparent_ef = velocity_ef - wind_ef_sailboat;
+    
     const float wind_apparent_dir_ef = degrees(atan2f(wind_apparent_ef.y, wind_apparent_ef.x));
     const float wind_apparent_speed = safe_sqrt(sq(wind_apparent_ef.x)+sq(wind_apparent_ef.y));
 
@@ -383,7 +391,7 @@ void Sailboat::update(const struct sitl_input &input)
     if (sim_time > 0.1 )
     {
         //char str[15] = " R: ";
-        //send_message(str,  rudder_force);
+        //send_message(str,  (float)input.wind.direction);
         //char str1[15] = " Yaw: ";
         //send_message(str1, yaw_rate);
         sim_time = 0;
@@ -391,7 +399,6 @@ void Sailboat::update(const struct sitl_input &input)
     
     // yaw rate in degrees/s
     //yaw_rate = get_yaw_rate(steering, speed);
-
     gyro = Vector3f(0,0,yaw_rate) + wave_gyro;
 
     // update attitude
@@ -399,7 +406,12 @@ void Sailboat::update(const struct sitl_input &input)
     dcm.normalize();
 
     // hull drag
-    float hull_drag = sq(speed) * 0.5f;
+    float hull_drag =0.0f;
+    if (speed > 0){
+    hull_drag = speed * speed * 0.410f - 0.035;
+    } else{
+        hull_drag = 0;
+    }
     if (!is_positive(speed)) {
         hull_drag *= -1.0f;
     }
@@ -473,10 +485,10 @@ void Sailboat::update(const struct sitl_input &input)
                                     "Qffffff",
                                     AP_HAL::micros64(),
                                     velocity_body.x, velocity_body.y, Nr, yaw_accel/M_PI*180, yaw_rate/M_PI*180,steering);
-    AP::logger().WriteStreaming("SIM4", "TimeUS,L,D,Ya,Yv,Sa",
+    AP::logger().WriteStreaming("SIM4", "TimeUS,L,D,Wd,Ws,Sa",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    lift_wf, drag_wf, sway_accel, sway_rate,main_sail_angle);
+                                    lift_wf, drag_wf, sway_accel, input.wind.direction,main_sail_angle);
 }
 
 } // namespace SITL

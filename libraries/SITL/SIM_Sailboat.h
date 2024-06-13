@@ -96,7 +96,7 @@ private:
     const float drag_curve_rudder[37] = {0.00f, 0.03f, 0.06f, 0.10f, 0.17f, 0.30f, 0.48f, 0.74f, 0.98f, 1.18f, 1.34f, 1.50f, 1.65f, 1.76f, 1.89f, 1.97f, 2.01f, 2.05f, 2.08f, 2.05f, 2.01f, 1.97f, 1.89f, 1.76f, 1.65f, 1.50f, 1.34f, 1.18f, 0.98f, 0.74f, 0.48f, 0.30f, 0.17f, 0.10f, 0.06f, 0.03f ,0.00f};
 
 
-    const float mass = 2.5f;
+    const float mass = 2.7f;
     
     // Rudder Dimensions
     float xr = 0.55f;
@@ -114,6 +114,7 @@ private:
     float sway_rate = 0.0f;      // rad/s
     float sway_accel = 0.0f;      // rad/s
     Vector3f velocity_ef_water;  // m/s
+    Vector3f wind_ef_sailboat;                    // m/s, earth frame wind
     Vector3f wave_gyro;          // rad/s
     float wave_heave;            // m/s/s
     float wave_phase;            // rads
