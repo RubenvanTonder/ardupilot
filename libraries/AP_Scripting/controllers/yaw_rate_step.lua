@@ -171,9 +171,10 @@ function update()
       STRCTL_ENABLE = 1
       -- Initialize PI Controller
       servo_function:set(K_rudder);
-      STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
+      
       if not start then
-         x_h = ahrs:get_yaw()-math.pi/6
+         STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
+         x_h = ahrs:get_yaw()+math.pi/6
          start = true
       end
    else

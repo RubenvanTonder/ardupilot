@@ -182,11 +182,11 @@ function update()
       desired_yaw = desired_heading:get()
 
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
-      if (previous_heading - desired_yaw) < -math.pi then
-         desired_yaw = desired_yaw - 2 * math.pi
-      elseif (previous_heading - desired_yaw) > math.pi then
-         desired_yaw = desired_yaw + 2 * math.pi
-      end
+      --if (previous_heading - desired_yaw) < -math.pi then
+        -- desired_yaw = desired_yaw - 2 * math.pi
+      --elseif (previous_heading - desired_yaw) > math.pi then
+        -- desired_yaw = desired_yaw + 2 * math.pi
+      -- end
 
       previous_heading = current_heading
       rudder_out = STR_PI.update(desired_yaw, current_heading)

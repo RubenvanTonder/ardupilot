@@ -151,8 +151,6 @@ local function update()
 
       
       --LOS Vector
-      local body_to_earth = Vector3f()
-      body_to_earth = ahrs:get_velocity_NED()
       local yaw = ahrs:get_yaw()
       local roll = ahrs:get_roll()
       local vex = gps:velocity(0):x()
@@ -163,15 +161,16 @@ local function update()
 
       vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
       vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
+      
       -- Check if vbx ~= 0 
       if (vbx>0.3) then
          beta = math.asin(constrain(vby/vbx,-0.2,0.2))
-         --beta=0
+        -- beta=0
       else
          beta=0
       end
       
-      beta = 0
+
       if tack:get() == 0 then
         x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
         x_d = x_p:get() - x_r - beta
@@ -187,7 +186,7 @@ local function update()
 
     -- Log path following controller data
     PTH_PI.log("PTHC")
-    logger:write("BXY",'Beta,BodyX,BodyY,GlobalX,GlobalY','fffff',beta,vbx,vby,vex,vey)
+    logger:write("BXY",'Beta,BodyX,BodyY,GlobalX,GlobalY','fffff',tostring(beta),tostring(vbx),tostring(vby),tostring(vex),tostring(vey))
    end
 end
  

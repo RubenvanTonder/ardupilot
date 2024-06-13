@@ -282,6 +282,7 @@ function UPDATE()
                 -- Save current location
                 current_location = ahrs:get_location()
 
+            --[[
                 -- Update counter so that oldest sample of location is swopped out with newest
                 if location_counter == 4 then
                    location_counter = 0 
@@ -304,11 +305,13 @@ function UPDATE()
 
                 -- Save current location as last active location
                 last_location = current_location
-                
+            --]]
             else 
-                current_location = last_location
+                gcs:send_text(4,"Not enough GPS Sats")
+                return UPDATE, 1000
+            
             end
-
+            
             
 
             -- Calculate the bearing and length between source and destination waypoint
@@ -340,7 +343,7 @@ function UPDATE()
             if (gps:num_sats(0) > 6) then
                 -- Save current location
                 current_location = ahrs:get_location()
-
+                --[[
                 -- Update counter so that oldest sample of location is swopped out with newest
                 if location_counter == 4 then
                    location_counter = 0 
@@ -363,8 +366,9 @@ function UPDATE()
 
                 -- Save current location as last active location
                 last_location = current_location
-                
+                ]]
             else 
+                gcs:send_text(4,"Not enough GPS Sats") 
                 current_location = last_location
             end
 

@@ -22,14 +22,14 @@ local _step_10 = -150
 
 local step_enable = 0
 
-local step_angle = _step_6
+local step_angle = step_8
 local AUX_FUNCTION_NUM = 300
+gcs:send_text(6,"Step: run " ..math.floor(step_angle/150*10))
 -- Update
 function update()
 
       -- Initialize the rudder step
         if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
-            gcs:send_text(6,"Step: run " ..math.floor(step_2/150*10))
             step_enable = 1
             -- Initialize PI Controller
             servo_function:set(K_rudder);
