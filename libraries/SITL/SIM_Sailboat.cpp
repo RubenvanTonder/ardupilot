@@ -246,7 +246,7 @@ void Sailboat::update(const struct sitl_input &input)
     // calculate apparent wind in earth-frame (this is the direction the wind is coming from)
     // Note than the SITL wind direction is defined as the direction the wind is travelling to
     // This is accounted for in these calculations
-    Vector3f wind_apparent_ef = velocity_ef - wind_ef_sailboat;
+    Vector3f wind_apparent_ef = velocity_ef - wind_ef;
     
     const float wind_apparent_dir_ef = degrees(atan2f(wind_apparent_ef.y, wind_apparent_ef.x));
     const float wind_apparent_speed = safe_sqrt(sq(wind_apparent_ef.x)+sq(wind_apparent_ef.y));
@@ -333,7 +333,8 @@ void Sailboat::update(const struct sitl_input &input)
             main_sail_angle = 30;
         }
         main_sail_angle = constrain_float(main_sail_angle,0,90);
-
+        main_sail_angle = 30;
+    
         // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
         aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - main_sail_angle, 0);
 

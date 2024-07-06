@@ -5,7 +5,7 @@ local sail_angle = 2
 -- sail angle 60 => 2
 
 -- Roll offset
-local offset = -7/180*math.pi
+local offset = 0
 local bat_volt = battery:voltage(0)
 gcs:send_text(6,"Battery Voltage " .. bat_volt)
 local nominal_voltage = 7.88
@@ -43,18 +43,20 @@ local AUX_FUNCTION_NUM = 301
 local servo_on = false
 local scripting_rc_1 = rc:find_channel_for_option(AUX_FUNCTION_NUM)
 local function update()
-    
+    --gcs:send_text(6,rc:get_aux_cached(AUX_FUNCTION_NUM))
     --Log Sail Angle
     logger.write("SAI",'SailPos','f',sail_angle)
     if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2  then
+        gcs:send_text(6,"Sail Controller active")
         -- Turn on Sail servo
         if servo_on then
             servo_function:set(sail_servo)
             servo_on = not(servo_on)
         end
 
+
         -- State 0: Check if roll angle is greater than ideal
-        if (math.deg(math.abs(ahrs:get_roll()+offset))) > 10 then  
+        if (math.deg(math.abs(ahrs:get_roll()+offset))) > 12 then  
             -- Check if sail can be winched out further
             if sail_angle < 2 then 
                 sail_angle = sail_angle+1

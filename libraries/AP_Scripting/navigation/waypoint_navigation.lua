@@ -6,7 +6,7 @@ UPDATE_RATE_HZ = 4
 -- Global parameters
 local table_track_heading =  Parameter("Nv_Heading")
 local table_cross_track =  Parameter("Nv_Crosstrack")
-local tack_heading = Parameter('Nv_Tack_Heading')
+local table_tack_heading = Parameter('Nv_Tack_Heading')
 local tack_require = Parameter('Nv_Tack')
 
 -- Get the data from onboard wind sensor
@@ -58,7 +58,7 @@ local on_board = 0
 local tack_right = true
 local max_tack_distance = 10.0
 local tack_heading = math.pi/4
-local no_go_zone = math.pi/4
+--local no_go_zone = math.pi/4
 local tacking = 0
 local going_home = false
 local radius_of_acceptance = 5
@@ -66,16 +66,9 @@ local radius_of_acceptance = 5
 -- current location of the sailboat
 local current_location
 local last_location
-local location1
-local location2
-local location3
-
-local location_counter = 0
 
 -- track heading angle
 local track_heading_angle = 0
-
-local heading_to_waypoint = 0.0
 -- track length
 local l_track = 0.0
 
@@ -96,7 +89,7 @@ local waypoint_passed = flse
 -- Time keeping for logging at different dates
 
 -- Desired Heading Angle
-local desired_heading = 0.0
+local tack_heading_angle = 0.0
 
 local started = false
 -- Generate a Location
@@ -130,8 +123,8 @@ local function passed_waypoint()
     end
     local x = src_dest:x()
     local y = src_dest:y()
-    distance = math.sqrt(x*x + y*y)
-    if (distance-l_track) < 0 then
+    local distance = math.sqrt(x*x + y*y)
+    if (distance-guidance_axis.s) < 0 then
         gcs:send_text(6,"Sailboat passed waypoint")
         return true
     else 
@@ -182,9 +175,9 @@ local function write_to_dataflash()
     logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
     logger:write('NAV2','direction,speed,onboard','fff',wind_direction,wind_speed,on_board)
     if going_home then
-        logger:write('NAV1','N,E,Ns,Es','ffff',tostring(0),tostring(0),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):x()),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):y()))
+        logger:write('NAV1','N,E,Ns,Es,T','fffff',tostring(0),tostring(0),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):x()),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):y()),tostring(tack_heading_angle))
     else
-        logger:write('NAV1','N,E,Ns,Es','ffff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):y()),tostring(waypoint.mission[0]:get_distance_NE(current_location):x()),tostring(waypoint.mission[0]:get_distance_NE(current_location):y()))
+        logger:write('NAV1','N,E,Ns,Es,T','fffff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):y()),tostring(waypoint.mission[0]:get_distance_NE(current_location):x()),tostring(waypoint.mission[0]:get_distance_NE(current_location):y()),tostring(tack_heading_angle))
     end
   end
 
@@ -196,34 +189,40 @@ end
 local function tack()
     -- Calculate if a tack is required
     -- Wind Angle measured on sailboat will be apparent wind angle so change this when working with the real sailboat
-    local wind_angle_radians = math.rad(wind_dir:get())
-    apparent_wind_angle = -wind_angle_radians + math.abs(track_heading_angle)
-    if math.abs(apparent_wind_angle) < no_go_zone then
+    -- use waypoint angle as wind direction
+    --local wind_angle_radians = math.rad(wind_dir:get())
+    apparent_wind_angle =track_heading_angle
+    tack_heading_angle = apparent_wind_angle
+    if true then
 
         tacking = 1
                 
         -- Perform tack right
         if tack_right then 
-            track_heading_angle = wind_angle_radians + tack_heading
+            -- Right tack tacking = 1 
+            tacking = 1
+            track_heading_angle = apparent_wind_angle + tack_heading
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e > max_tack_distance then
                 tack_right = false
-                track_heading_angle = wind_angle_radians - tack_heading
+                track_heading_angle = apparent_wind_angle - tack_heading
             end
             -- Perform tack left
         else
-            track_heading_angle = wind_angle_radians - tack_heading
+            -- Left tack tacking = 2
+            tacking = 2
+            track_heading_angle = apparent_wind_angle - tack_heading
 
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e < -max_tack_distance then
                 tack_right = true
-                track_heading_angle = wind_angle_radians + tack_heading
+                track_heading_angle = apparent_wind_angle + tack_heading
             end
         end
 
     else
-    --print("Tack not Required")
-    tacking = 0
+        --print("Tack not Required")
+        tacking = 0
     end
     -- Set global tack parameter 
     tack_require:set(tacking)
@@ -236,27 +235,27 @@ function UPDATE()
         return UPDATE, 1000
     end 
 
-    local wind_settings = nv_wind:get()
-    on_board = math.rad(wnd_onboard:get())
-    wind_speed = wnd_speed:get()
-    wind_direction = math.rad(wnd_direction:get())
+    --local wind_settings = nv_wind:get()
+    --on_board = math.rad(wnd_onboard:get())
+    --wind_speed = wnd_speed:get()
+    --wind_direction = math.rad(wnd_direction:get())
     -- Onboard wind sensor
-    if wind_settings == 0 then 
-        apparent_wind_angle = on_board
+    --if wind_settings == 0 then 
+       -- apparent_wind_angle = on_board
         --gcs:send_text(6, "AWA " .. apparent_wind_angle)
 
     -- Weather Station wind direction and speed
-    elseif wind_settings == 1 then
-        apparent_wind_angle = ahrs:get_yaw() - wind_direction
+    --elseif wind_settings == 1 then
+        --apparent_wind_angle = ahrs:get_yaw() - wind_direction
         --gcs:send_text(6, "AWA " .. apparent_wind_angle)
 
     -- Simulation Weather Data
-    else 
-        wind_direction = math.rad(sim_wind_direction:get())
-        wind_speed = sim_wind_speed:get()
-        apparent_wind_angle = ahrs:get_yaw() - wind_direction
+    --else 
+     --   wind_direction = math.rad(sim_wind_direction:get())
+     --   wind_speed = sim_wind_speed:get()
+     --   apparent_wind_angle = ahrs:get_yaw() - wind_direction
        -- gcs:send_text(6, "AWA " .. apparent_wind_angle)
-    end
+    --end
     -- Wait for sailboat to be armed
     if arming:is_armed()then      
         
@@ -266,9 +265,6 @@ function UPDATE()
             -- Save home location 
             last_location = ahrs:get_location()
             -- Initialize location array
-            location1 = ahrs:get_location()
-            location2 = ahrs:get_location()
-            location3 = ahrs:get_location()
             loaded = true
         end
 
@@ -278,7 +274,7 @@ function UPDATE()
             -- Home will only stay fixed when sailboat is armed
             
             -- Update Current Position
-            if (gps:num_sats(0) > 6) then
+            if (gps:num_sats(0) > 5) then
                 -- Save current location
                 current_location = ahrs:get_location()
 
@@ -322,7 +318,7 @@ function UPDATE()
 
             -- Check if waypoint has been reached
             waypoint_passed = passed_waypoint()
-            waypoint_reached = circle_of_acceptance(current_location,waypoint.mission[current_waypoint])
+            --waypoint_reached = circle_of_acceptance(current_location,waypoint.mission[current_waypoint])
             if waypoint_reached or waypoint_passed then
                 current_waypoint = current_waypoint + 1
                 waypoint_reached = false
@@ -332,7 +328,7 @@ function UPDATE()
             end
 
             -- Check if tack is required
-            --tack()
+            tack()
 
         else 
             --Heading Home
@@ -377,12 +373,12 @@ function UPDATE()
 
             -- Get distance along the track and cross-track error between home and waypoint 1
             guidance_axis_calc(current_location, waypoint.mission[waypoint.total-1])
-            -- Check if tack is required
-            --tack()
+            -- Force Tack
+            tack()
 
             -- Check if waypoint has been reached
             waypoint_passed = passed_waypoint()
-            waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[0])
+            --waypoint_reached = circle_of_acceptance(current_location, waypoint.mission[0])
 
             if waypoint_reached or waypoint_passed then
                 current_waypoint = 1;
@@ -400,6 +396,10 @@ function UPDATE()
 
         if not table_cross_track:set(guidance_axis.e) then
             gcs:send_text(6,"Could not update crosstrack error to table")
+        end
+        
+        if not table_tack_heading:set(tack_heading_angle) then
+            gcs:send_text(6, "Could not set tack heading")
         end
     end
     return UPDATE, 1000/UPDATE_RATE_HZ

@@ -181,12 +181,13 @@ function update()
       -- path following contrller or tacking controller
       desired_yaw = desired_heading:get()
 
+      --desired_yaw = constrain(desired_yaw,-math.pi, math.pi)
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
-      --if (previous_heading - desired_yaw) < -math.pi then
-        -- desired_yaw = desired_yaw - 2 * math.pi
-      --elseif (previous_heading - desired_yaw) > math.pi then
-        -- desired_yaw = desired_yaw + 2 * math.pi
-      -- end
+      if (previous_heading - current_heading) < -math.pi then
+         current_heading = current_heading - 2 * math.pi
+      elseif (previous_heading - current_heading) > math.pi then
+         current_heading = current_heading + 2 * math.pi
+      end
 
       previous_heading = current_heading
       rudder_out = STR_PI.update(desired_yaw, current_heading)

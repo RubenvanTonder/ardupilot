@@ -46,7 +46,7 @@ local function update()
     
     --Log Sail Angle
     logger.write("SAI",'SailPos','f',sail_angle)
-    if scripting_rc_1:norm_input() > 0 then
+    if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2  then
         -- Turn on Sail servo
         if servo_on then
             servo_function:set(sail_servo)
