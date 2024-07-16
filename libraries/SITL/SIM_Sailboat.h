@@ -52,6 +52,9 @@ private:
     // calculate the lift and drag values for the rudder for a given boat speed and angle of attack in degrees
     void calc_lift_and_drag_rudder(float boat_speed, float angle_of_attack_deg, float& lift, float& drag) const;
 
+    // calculate the lift and drag values for the rudder for a given boat speed and angle of attack in degrees
+    void calc_lift_and_drag_keel(float boat_speed, float angle_of_attack_deg, float& lift, float& drag) const;
+
     // return turning circle (diameter) in meters for steering angle proportion in the range -1 to +1
     float get_turn_circle(float steering) const;
 
@@ -60,6 +63,9 @@ private:
 
     // return yaw rate in rad/sec given a steering input (in the range -30 to +30) and speed in m/s
     float get_yaw_rate_df(float rf, float u, float v, float dt, float vdot, float& yaw_acc) const;
+
+     // return yaw rate in rad/sec given a steering input (in the range -30 to +30) and speed in m/s
+    float get_roll_rate(float sf, float kf, float& roll_rate, float roll_angle, float &roll_acc, float dt) const;
 
     // return sway rate deg/sec
     float get_sway_velocity(float rf, float& sway_acc, float u, float r, float dt) const;
@@ -95,8 +101,34 @@ private:
     // angle-of-attack                   0 -> 180
     const float drag_curve_rudder[37] = {0.00f, 0.03f, 0.06f, 0.10f, 0.17f, 0.30f, 0.48f, 0.74f, 0.98f, 1.18f, 1.34f, 1.50f, 1.65f, 1.76f, 1.89f, 1.97f, 2.01f, 2.05f, 2.08f, 2.05f, 2.01f, 1.97f, 1.89f, 1.76f, 1.65f, 1.50f, 1.34f, 1.18f, 0.98f, 0.74f, 0.48f, 0.30f, 0.17f, 0.10f, 0.06f, 0.03f ,0.00f};
 
+    // lift and drag curves for rudder
+    // angle-of-attack                   0 -> 180
+    const float lift_curve_keel[37] = { 0.00f, 0.42f, 0.73f, 0.95f, 1.10f, 1.17f, 1.18f, 1.16f, 1.12f, 1.07f, 1.00f, 0.92f, 0.83f, 0.72f, 0.62f, 0.48f, 0.33f, 0.16f, 0.00f, -0.16f, -0.33f, -0.48f, -0.62f, -0.72f, -0.83f, -0.92f, -1.00f, -1.07f, -1.12f, -1.16f, -1.18f, -1.17f, -1.10f, -0.95f, -0.73f, -0.42f, 0.00f};
+                                        
+    // angle-of-attack                   0 -> 180
+    const float drag_curve_keel[37] = {0.00f, 0.03f, 0.06f, 0.10f, 0.17f, 0.30f, 0.48f, 0.74f, 0.98f, 1.18f, 1.34f, 1.50f, 1.65f, 1.76f, 1.89f, 1.97f, 2.01f, 2.05f, 2.08f, 2.05f, 2.01f, 1.97f, 1.89f, 1.76f, 1.65f, 1.50f, 1.34f, 1.18f, 0.98f, 0.74f, 0.48f, 0.30f, 0.17f, 0.10f, 0.06f, 0.03f ,0.00f};
 
     const float mass = 2.7f;
+
+    // Hull drag
+    float hull_x = 0.0f;
+    //float hull_y = 0.0f;
+    //float hull_roll = 0.0f;
+    //float hull_yaw = 0.0f;
+
+    // Hull Dimensions
+    float xh = 0.02f;
+
+    // Keel Dimensions
+    float xk = 0.0f;
+    float yk = 0.0f;
+    float zk = 0.25f;
+    float keel_area = 0.02f;
+    float zeta_k = 1.0f;
+    float d_k = 0.4f;
+
+    // Sail Dimensions
+    float zs = 0.6f;
     
     // Rudder Dimensions
     float xr = 0.55f;
@@ -109,10 +141,14 @@ private:
 
     float sim_time = 0.0f;
 
+    float roll_angle = 0.0f;
     float yaw_rate = 0.0f;       // rad/s
     float yaw_accel = 0.0f;      // rad/s
     float sway_rate = 0.0f;      // rad/s
     float sway_accel = 0.0f;      // rad/s
+    float roll_accel = 0.0f;    // rad/s
+    float roll_rate = 0.0f;     // rad
+
     Vector3f velocity_ef_water;  // m/s
     Vector3f wind_ef_sailboat;                    // m/s, earth frame wind
     Vector3f wave_gyro;          // rad/s

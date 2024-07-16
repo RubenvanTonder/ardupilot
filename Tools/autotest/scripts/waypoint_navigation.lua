@@ -6,7 +6,7 @@ UPDATE_RATE_HZ = 4
 -- Global parameters
 local table_track_heading =  Parameter("Nv_Heading")
 local table_cross_track =  Parameter("Nv_Crosstrack")
-local tack_heading = Parameter('Nv_Tack_Heading')
+local table_tack_heading = Parameter('Nv_Tack_Heading')
 local tack_require = Parameter('Nv_Tack')
 
 -- Get the data from onboard wind sensor
@@ -58,7 +58,7 @@ local on_board = 0
 local tack_right = true
 local max_tack_distance = 10.0
 local tack_heading = math.pi/4
-local no_go_zone = math.pi/4
+--local no_go_zone = math.pi/4
 local tacking = 0
 local going_home = false
 local radius_of_acceptance = 5
@@ -69,8 +69,6 @@ local last_location
 
 -- track heading angle
 local track_heading_angle = 0
-
-local heading_to_waypoint = 0.0
 -- track length
 local l_track = 0.0
 
@@ -91,7 +89,7 @@ local waypoint_passed = flse
 -- Time keeping for logging at different dates
 
 -- Desired Heading Angle
-local desired_heading = 0.0
+local tack_heading_angle = 0.0
 
 local started = false
 -- Generate a Location
@@ -177,9 +175,9 @@ local function write_to_dataflash()
     logger:write('NAV','s,e,tack,waypoint,heading','fffff',tostring(guidance_axis.s),tostring(guidance_axis.e), tostring(tacking), tostring(current_waypoint), tostring(track_heading_angle))
     logger:write('NAV2','direction,speed,onboard','fff',wind_direction,wind_speed,on_board)
     if going_home then
-        logger:write('NAV1','N,E,Ns,Es','ffff',tostring(0),tostring(0),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):x()),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):y()))
+        logger:write('NAV1','N,E,Ns,Es,T','fffff',tostring(0),tostring(0),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):x()),tostring(waypoint.mission[waypoint.total-1]:get_distance_NE(current_location):y()),tostring(tack_heading_angle))
     else
-        logger:write('NAV1','N,E,Ns,Es','ffff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):y()),tostring(waypoint.mission[0]:get_distance_NE(current_location):x()),tostring(waypoint.mission[0]:get_distance_NE(current_location):y()))
+        logger:write('NAV1','N,E,Ns,Es,T','fffff',tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):x()),tostring(waypoint.mission[0]:get_distance_NE(waypoint.mission[current_waypoint]):y()),tostring(waypoint.mission[0]:get_distance_NE(current_location):x()),tostring(waypoint.mission[0]:get_distance_NE(current_location):y()),tostring(tack_heading_angle))
     end
   end
 
@@ -194,12 +192,15 @@ local function tack()
     -- use waypoint angle as wind direction
     --local wind_angle_radians = math.rad(wind_dir:get())
     apparent_wind_angle =track_heading_angle
+    tack_heading_angle = apparent_wind_angle
     if true then
 
         tacking = 1
                 
         -- Perform tack right
         if tack_right then 
+            -- Right tack tacking = 1 
+            tacking = 1
             track_heading_angle = apparent_wind_angle + tack_heading
             -- check if crosstrack error has been reached then switch tack
             if guidance_axis.e > max_tack_distance then
@@ -208,6 +209,8 @@ local function tack()
             end
             -- Perform tack left
         else
+            -- Left tack tacking = 2
+            tacking = 2
             track_heading_angle = apparent_wind_angle - tack_heading
 
             -- check if crosstrack error has been reached then switch tack
@@ -218,8 +221,8 @@ local function tack()
         end
 
     else
-    --print("Tack not Required")
-    tacking = 0
+        --print("Tack not Required")
+        tacking = 0
     end
     -- Set global tack parameter 
     tack_require:set(tacking)
@@ -271,7 +274,7 @@ function UPDATE()
             -- Home will only stay fixed when sailboat is armed
             
             -- Update Current Position
-            if (gps:num_sats(0) > 6) then
+            if (gps:num_sats(0) > 5) then
                 -- Save current location
                 current_location = ahrs:get_location()
 
@@ -393,6 +396,10 @@ function UPDATE()
 
         if not table_cross_track:set(guidance_axis.e) then
             gcs:send_text(6,"Could not update crosstrack error to table")
+        end
+        
+        if not table_tack_heading:set(tack_heading_angle) then
+            gcs:send_text(6, "Could not set tack heading")
         end
     end
     return UPDATE, 1000/UPDATE_RATE_HZ
