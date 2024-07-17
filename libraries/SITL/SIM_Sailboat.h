@@ -68,7 +68,7 @@ private:
     float get_roll_rate(float sf, float kf, float& roll_rate, float roll_angle, float &roll_acc, float dt) const;
 
     // return sway rate deg/sec
-    float get_sway_velocity(float rf, float& sway_acc, float u, float r, float dt) const;
+    float get_sway_velocity(float Yrud, float Ysail, float Ykeel, float& yawrate, float surge_vel, float sway_vel, float Yhull, float& sway_acc, float dt) const;
 
     // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
     float get_lat_accel(float steering, float speed) const;
@@ -83,16 +83,22 @@ private:
     float turning_circle;       // vehicle minimum turning circle diameter in meters
     
     float starting_sail_angle = 30.0f; //starting sail angle for winch controlled sail
-    int main_sail_angle =  60.0f; //starting angle of the main sail
+    float main_sail_angle =  30.0f; //starting angle of the main sail
     float current_sail_angle = starting_sail_angle; // current sail angle for winch controlled sail
     float previous_sail_angle = 30.0f; // previous sail angle for winch controlled sail
 
     float timer; // timer to count to 1s and then send message to terminal in SITL
 
     // lift and drag curves for sail.  index is angle/10deg
-    // angle-of-attack            0      10     20     30     40     50     60     70     80     90      100     110     120     130     140     150     160     170+
-    const float lift_curve[18] = {0.00f, 0.32f, 0.70f, 1.15f, 1.28f, 1.10f, 1.00f, 0.82f, 0.68f, 0.48f, 0.21f, -0.06f, -0.30f, -0.53f, -0.72f, -0.95f, -1.1f, -1.08f};
-    const float drag_curve[18] = {0.10f, 0.14f, 0.19f, 0.35f, 0.54f, 0.70f, 0.9f, 1.04f, 1.16f, 1.24f,  1.28f,  1.36f,  1.33f,  1.28f,  1.25f,  1.10f,  0.88f,  0.64f};
+    // angle-of-attack            0 -> 180
+    //const float lift_curve[18] = {0.00f, 0.32f, 0.70f, 1.15f, 1.28f, 1.10f, 1.00f, 0.82f, 0.68f, 0.48f, 0.21f, -0.06f, -0.30f, -0.53f, -0.72f, -0.95f, -1.1f, -1.08f};
+    //const float drag_curve[18] = {0.10f, 0.14f, 0.19f, 0.35f, 0.54f, 0.70f, 0.9f, 1.04f, 1.16f, 1.24f,  1.28f,  1.36f,  1.33f,  1.28f,  1.25f,  1.10f,  0.88f,  0.64f};
+
+    // lift and drag curves for sail.  index is angle/10deg
+    // angle-of-attack            0 -> 180
+    const float lift_curve[37] = {0.00f, 0.15f, 0.32f, 0.48f, 0.7f, 0.94f, 1.15f, 1.3f, 1.28f, 1.15f, 1.1f, 1.05f, 1.0f, 0.9f, 0.82f, 0.72f, 0.68f, 0.56f, 0.48f, 0.32f,0.21f,0.08f,-0.06f, -0.18f, -0.3f, -0.4f, -0.53f, -0.64f, -0.72f, -0.84f, -0.95f, -1.04f, -1.1f, -1.14f, -1.08f, -0.76f, 0.0f};
+    const float drag_curve[37] = {0.10f, 0.12f, 0.14f, 0.16f, 0.19f, 0.26f, 0.35f, 0.46f, 0.54f, 0.62f,  0.7f,  0.78f,  0.9f,  0.98f,  1.04f,  1.08f,  1.16f,  1.2f, 1.24f, 1.26f, 1.28f, 1.34f, 1.36f, 1.37f, 1.33f, 1.31f, 1.28f, 1.26f, 1.25f, 1.2f, 1.1f, 1.04f, 0.88f, 0.8f, 0.64f, 0.38f, 0.1f};
+
 
     // lift and drag curves for rudder
     // angle-of-attack                   0 -> 180
@@ -112,7 +118,7 @@ private:
 
     // Hull drag
     float hull_x = 0.0f;
-    //float hull_y = 0.0f;
+    float hull_y = 0.0f;
     //float hull_roll = 0.0f;
     //float hull_yaw = 0.0f;
 
@@ -148,6 +154,7 @@ private:
     float sway_accel = 0.0f;      // rad/s
     float roll_accel = 0.0f;    // rad/s
     float roll_rate = 0.0f;     // rad
+    float sway_velocity =0.0f; //m/s
 
     Vector3f velocity_ef_water;  // m/s
     Vector3f wind_ef_sailboat;                    // m/s, earth frame wind

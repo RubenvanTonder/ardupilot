@@ -178,20 +178,26 @@ float Sailboat::get_yaw_rate_df(float rf, float u, float v, float dt, float vdot
     return (yaw_acc / 0.15 * dt + yaw_rate);
 }
 
-// return the sway rate in rad/sec
-float Sailboat::get_sway_velocity(float rf, float& sway_acc, float u, float r, float dt) const
+// return the sway rate in m/sec
+float Sailboat::get_sway_velocity(float Yrud, float Ysail, float Ykeel, float& yawrate, float surge_vel, float sway_vel, float Yhull, float& sway_acc, float dt) const
 {
-    sway_acc = rf - 0.56938 * u - sway_acc * 2.5 - 0.08 * u *r-sway_rate*1.5;
-    sway_acc /= 4.8532;
-    constrain_float(sway_acc,-0.1,-0.1);
-    return constrain_float(sway_acc * dt + sway_rate,-0.1,0.1);
+    sway_acc =   10 *Ysail -   0.5*sway_vel * surge_vel/1.3 + Yhull; 
+    sway_acc /= 5.2415;
+    // - Ykeel/4 
+    //2 * Yrud
+    //- mass * sway_acc
+    //-mass*surge_vel*sway_vel
+    //0.12707 * yawrate
+    //- 0.085426*surge_vel*yawrate
+    //surge_vel*0.085426*yawrate
+    return sway_acc * dt + sway_vel;
 }
 
 float Sailboat::get_roll_rate(float sf, float kf, float& roll_r, float roll_a, float &roll_acc,float dt) const
 {
     roll_acc = 5.0f * sf - 1.138f * roll_r - 0.0924f * roll_r * abs(roll_r) + roll_r * roll_r * roll_r * 0.000229f - roll_a * 13.823f - kf;
     
-    return constrain_float(roll_acc*dt,-0.1f,0.1f);
+    return roll_acc*dt + roll_r;
 }
 
 // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
@@ -372,15 +378,14 @@ void Sailboat::update(const struct sitl_input &input)
         }
         main_sail_angle = constrain_float(main_sail_angle,0,90);
         if (wind_apparent_dir_bf >0 ){
-            main_sail_angle = -30.0f;
-        }else {
             main_sail_angle = 30.0f;
+        }else {
+            main_sail_angle = -30.0f;
         }
         
     
         // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
         aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - fabsf(main_sail_angle), 0);
-
         if (is_negative(wind_apparent_dir_bf)) {
             // take into account the current tack
             aoa_deg *= -1;
@@ -396,7 +401,12 @@ void Sailboat::update(const struct sitl_input &input)
     const float sin_rot_rad = sinf(radians(wind_apparent_dir_bf));
     const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf));
     const float force_fwd = (lift_wf * sin_rot_rad) - (drag_wf * cos_rot_rad);
-    float Ks = -zs * lift_wf * cosf(wind_apparent_dir_bf) + drag_wf * sinf(wind_apparent_dir_bf);
+    float Ks = -zs * lift_wf * cos_rot_rad + drag_wf * sin_rot_rad;
+    float Ys = lift_wf * cos_rot_rad + drag_wf * sin_rot_rad;
+    //Xs =(Ls * sin(awa) - Ds * cos(awa));
+    //Ys = (Ls * cos(awa) + Ds * sin(awa));
+    //Ks = -zs *(Ls * cos(awa) + Ds * sin(awa));
+    //Ns = (-Xs * xsm * sin(delta_s) +Ys*(xm-xsm*cos(delta_s)));
 
     
 
@@ -449,6 +459,7 @@ void Sailboat::update(const struct sitl_input &input)
 
     // Keel Forces and Moments
     float Kk = (lift_force_keel * cosf(alpha_ak) + drag_force_keel * sinf(alpha_ak)) * zk;
+    float Yk = (lift_force_keel * cosf(alpha_ak) - drag_force_keel * cosf(alpha_ak));
     //Xk = (-lift_force * sin(alpha_ak) + drag_force * cos(alpha_ak));
     //Yk = (-lift_force * cos(alpha_ak) - drag_force * sin(alpha_ak))*cos(phi);
     //Kk = (lift_force*cos(alpha_ak)+drag_force*sin(alpha_ak))*zk;
@@ -457,10 +468,11 @@ void Sailboat::update(const struct sitl_input &input)
     // Acceleration and Velocity Calculation
     yaw_rate = get_yaw_rate_df(Nr, velocity_body.x, velocity_body.y, delta_time, accel_body.y, yaw_accel);
 
-    sway_rate = get_sway_velocity(Yr, sway_accel, velocity_body.x, yaw_rate, delta_time);
-    sway_rate = sway_rate;
+    sway_rate = get_sway_velocity(Yr, Ys, Yk, yaw_rate, velocity_body.x, sway_velocity, hull_y, sway_accel, delta_time);
+    sway_velocity = sway_rate;
+    sway_velocity = constrain_float(sway_velocity, -0.2f,0.2f);
 
-    roll_rate = get_roll_rate(Ks*11.25,Kk,roll_rate,roll_angle, roll_accel, delta_time);
+    roll_rate = get_roll_rate(Ks*7.5-0.5,Kk,roll_rate,roll_angle, roll_accel, delta_time);
     roll_angle = roll_angle + roll_rate * delta_time;
     // yaw rate in degrees/s
     //yaw_rate = get_yaw_rate(steering, speed);
@@ -495,7 +507,7 @@ void Sailboat::update(const struct sitl_input &input)
 
     // Hull force and moments
     hull_x = hull_drag * cosf(alpha_ah);
-
+    hull_y = hull_drag * sinf(alpha_ah);
 
 
     // throttle force (for motor sailing)
@@ -575,18 +587,22 @@ void Sailboat::update(const struct sitl_input &input)
         sim_time = 0;
     }
 
-    AP::logger().WriteStreaming("SIM3", "TimeUS,Bx,By,Rf,Na,Nv,Ra",
+    AP::logger().WriteStreaming("SIM3", "TimeUS,Bx,By,Rf,Lf,Df,Ra",
                                     "Qffffff",
                                     AP_HAL::micros64(),
-                                    velocity_body.x, velocity_body.y, Nr, yaw_accel/M_PI*180, yaw_rate/M_PI*180,steering);
-    AP::logger().WriteStreaming("SIM4", "TimeUS,Hx,Wind_aoa,roll_rate,roll_acc,Sa",
+                                    velocity_body.x, velocity_body.y, Nr, lift_wf, drag_wf,steering);
+    AP::logger().WriteStreaming("SIM4", "TimeUS,Hy,Ys,Yk,Yr,Sa",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    hull_x, aoa_deg, roll_rate, roll_accel,main_sail_angle);
-    AP::logger().WriteStreaming("SIM5", "TimeUS,Ks,Kk,Kl,Kd,Roll",
+                                    hull_y, Ys, Yk/4, Yr*8,main_sail_angle);
+    AP::logger().WriteStreaming("SIM5", "TimeUS,Sway_accel,sway_rate,sway_vel,t6,Roll",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    Ks, Kk, lift_force_keel, drag_force_keel,roll_angle*180/M_PI);
+                                    sway_accel, sway_rate, sway_velocity, velocity_body.x*0.085426*yaw_rate,roll_angle*180/M_PI);
+    AP::logger().WriteStreaming("SIM6", "TimeUS,t1,t2,t3,t4,t5",
+                                    "Qfffff",
+                                    AP_HAL::micros64(),
+                                    0.12707 * yaw_rate, mass * sway_accel,  0.085426*velocity_body.x*yaw_rate, -mass*velocity_body.x*sway_rate,0.56044*sway_rate * velocity_body.x/1.3);
 }
 
 } // namespace SITL
