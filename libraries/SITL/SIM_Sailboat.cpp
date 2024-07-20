@@ -181,7 +181,7 @@ float Sailboat::get_yaw_rate_df(float rf, float u, float v, float dt, float vdot
 // return the sway rate in m/sec
 float Sailboat::get_sway_velocity(float Yrud, float Ysail, float Ykeel, float& yawrate, float surge_vel, float sway_vel, float Yhull, float& sway_acc, float dt) const
 {
-    sway_acc =   10 *Ysail -   0.5*sway_vel * surge_vel/1.3 + Yhull; 
+    sway_acc =   -20 *Ysail - 0.5*sway_vel * surge_vel/1.3 + Yhull - Ykeel/4 +  Yrud - mass/4 * sway_acc -mass*surge_vel*sway_vel +0.12707 * yawrate - 0.085426*surge_vel*yawrate; 
     sway_acc /= 5.2415;
     // - Ykeel/4 
     //2 * Yrud
@@ -190,7 +190,7 @@ float Sailboat::get_sway_velocity(float Yrud, float Ysail, float Ykeel, float& y
     //0.12707 * yawrate
     //- 0.085426*surge_vel*yawrate
     //surge_vel*0.085426*yawrate
-    return sway_acc * dt + sway_vel;
+    return sway_acc + dt * sway_velocity;
 }
 
 float Sailboat::get_roll_rate(float sf, float kf, float& roll_r, float roll_a, float &roll_acc,float dt) const
@@ -468,9 +468,8 @@ void Sailboat::update(const struct sitl_input &input)
     // Acceleration and Velocity Calculation
     yaw_rate = get_yaw_rate_df(Nr, velocity_body.x, velocity_body.y, delta_time, accel_body.y, yaw_accel);
 
-    sway_rate = get_sway_velocity(Yr, Ys, Yk, yaw_rate, velocity_body.x, sway_velocity, hull_y, sway_accel, delta_time);
-    sway_velocity = sway_rate;
-    sway_velocity = constrain_float(sway_velocity, -0.2f,0.2f);
+    sway_accel = get_sway_velocity(Yr, Ys, Yk, yaw_rate, velocity_body.x, sway_velocity, hull_y, sway_accel, delta_time);
+    sway_velocity = 0.25 *sway_accel + sway_velocity * delta_time;
 
     roll_rate = get_roll_rate(Ks*7.5-0.5,Kk,roll_rate,roll_angle, roll_accel, delta_time);
     roll_angle = roll_angle + roll_rate * delta_time;
@@ -523,7 +522,7 @@ void Sailboat::update(const struct sitl_input &input)
     accel_body /= mass;
     
     // add in accel due to direction change
-    accel_body.y += yaw_rate * speed;
+    accel_body.y += yaw_rate * speed *1.2;
 
     // now in earth frame
     // remove roll and pitch effects from waves
@@ -594,7 +593,7 @@ void Sailboat::update(const struct sitl_input &input)
     AP::logger().WriteStreaming("SIM4", "TimeUS,Hy,Ys,Yk,Yr,Sa",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    hull_y, Ys, Yk/4, Yr*8,main_sail_angle);
+                                    hull_y, 20*Ys, Yk/4, Yr,main_sail_angle);
     AP::logger().WriteStreaming("SIM5", "TimeUS,Sway_accel,sway_rate,sway_vel,t6,Roll",
                                     "Qfffff",
                                     AP_HAL::micros64(),
@@ -602,7 +601,17 @@ void Sailboat::update(const struct sitl_input &input)
     AP::logger().WriteStreaming("SIM6", "TimeUS,t1,t2,t3,t4,t5",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    0.12707 * yaw_rate, mass * sway_accel,  0.085426*velocity_body.x*yaw_rate, -mass*velocity_body.x*sway_rate,0.56044*sway_rate * velocity_body.x/1.3);
+                                    0.12707 * yaw_rate, -mass * sway_accel/4,  -0.085426*velocity_body.x*yaw_rate, -mass*velocity_body.x*sway_rate,-0.5*sway_rate * velocity_body.x/1.3);
+    AP::logger().WriteStreaming("SIM7", "TimeUS,roll1,roll2,roll3,roll4,roll5",
+                                    "Qfffff",
+                                    AP_HAL::micros64(),
+                                    5.0f * Ys, 1.138f * roll_rate, 0.0924f * roll_rate * abs(roll_rate),  roll_rate * roll_rate * roll_rate * 0.000229f,roll_rate * 0.000229f);
+
+                                    //roll_r * 0.000229f - roll_a * 13.823f - kf
+    AP::logger().WriteStreaming("SIM8", "TimeUS,roll6,roll7,roll_rate,roll_angle,t5",
+                                    "Qfffff",
+                                    AP_HAL::micros64(),
+                                    roll_angle * 13.823f,Kk, roll_rate,roll_angle,0.56044*sway_rate * velocity_body.x/1.3);                                
 }
 
 } // namespace SITL

@@ -156,8 +156,8 @@ local function update()
       local vex = gps:velocity(0):x()
       local vey = gps:velocity(0):y()
 
-      --gcs:send_text(6, "ground speed x" .. ahrs:groundspeed_vector():x())
-      --gcs:send_text(6, "ground speed y" .. ahrs:groundspeed_vector():y())
+      --gcs:send_text(6, "ground speed x " .. vex)
+      --gcs:send_text(6, "ground speed y " .. vey)
 
       vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
       vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
@@ -175,6 +175,8 @@ local function update()
         x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
         x_d = x_p:get() - x_r - beta
         x_d = x_d 
+        -- Log path following controller data
+        PTH_PI.log("PTHC")
       else 
         x_d = x_p:get() - beta
         --print("Desired Tack Heading " .. x_d)
@@ -184,8 +186,7 @@ local function update()
         gcs:send_text(6, string.format('Desired heading set failed'))
       end
 
-    -- Log path following controller data
-    PTH_PI.log("PTHC")
+    
     logger:write("BXY",'Beta,BodyX,BodyY,GlobalX,GlobalY','fffff',tostring(beta),tostring(vbx),tostring(vby),tostring(vex),tostring(vey))
    end
 end
