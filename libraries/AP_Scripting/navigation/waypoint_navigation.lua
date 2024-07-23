@@ -56,7 +56,7 @@ local on_board = 0
 
 -- Tacking and Indirect waypoint approach
 local tack_right = true
-local max_tack_distance = 10.0
+local max_tack_distance = 5.0
 local tack_heading = math.pi/4
 --local no_go_zone = math.pi/4
 local tacking = 0
