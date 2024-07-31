@@ -25,6 +25,18 @@
 #include <string.h>
 #include <stdio.h>
 #include <AP_Logger/AP_Logger.h>
+#include <random>
+
+// Wind simulation parameters
+const double mean = 0;
+const double stddev = 0.1;
+std::default_random_engine generator;
+std::normal_distribution<double> dist(mean, stddev);
+int update_rate = 100;
+int counter =0;
+double wind_sim_speed = 2.5;
+double wind_change = 0;
+double wind_sim_direction = 180.0f;
 
 extern const AP_HAL::HAL& hal;
 
@@ -275,7 +287,22 @@ void Sailboat::update(const struct sitl_input &input)
 {
     // update wind
     //input.wind.direction = 90.0f;
+
+    // Update wind speed
+    if (counter == update_rate){
+        wind_change = dist(generator);
+        wind_sim_speed = constrain_double(wind_sim_speed + wind_change,0.0,5.0);
+        wind_change = dist(generator);
+        wind_sim_direction = constrain_double(wind_sim_direction + 10*wind_change, 0.0, 360.0);
+        counter = 0;
+    }else {
+        counter =counter +1;
+    }
+
     update_wind(input);
+    
+    
+    
 
     // wind vector in earth frame
     wind_ef_sailboat = Vector3f(cosf(radians(180.0f))*cosf(radians(0.0f)), 
@@ -287,9 +314,18 @@ void Sailboat::update(const struct sitl_input &input)
     float steering = ((input.servos[STEERING_SERVO_CH]-1500)/500.0f*32.0f);
     //char str[15] = "Rudder Angle";
     //send_message(str, steering);
+
     // calculate apparent wind in earth-frame (this is the direction the wind is coming from)
     // Note than the SITL wind direction is defined as the direction the wind is travelling to
-    // This is accounted for in these calculations
+    // This is accounted for in these calculations // wind vector in earth frame
+
+    wind_ef = Vector3f(cosf(radians(wind_sim_direction))*cosf(radians(input.wind.dir_z)), 
+                       sinf(radians(wind_sim_direction))*cosf(radians(input.wind.dir_z)), 
+                       sinf(radians(input.wind.dir_z))) * wind_sim_speed;
+
+    // the AHRS wants wind with opposite sense
+    wind_ef = -wind_ef;
+
     Vector3f wind_apparent_ef = velocity_ef - wind_ef;
     
     const float wind_apparent_dir_ef = degrees(atan2f(wind_apparent_ef.y, wind_apparent_ef.x));
@@ -475,7 +511,7 @@ void Sailboat::update(const struct sitl_input &input)
     roll_angle = roll_angle + roll_rate * delta_time;
     // yaw rate in degrees/s
     //yaw_rate = get_yaw_rate(steering, speed);
-    gyro = Vector3f(0,0,yaw_rate) + wave_gyro;
+    gyro = Vector3f(0,0,yaw_rate*velocity_body.x/1.3f) + wave_gyro;
 
     // update attitude
     dcm.rotate(gyro * delta_time);
@@ -608,10 +644,10 @@ void Sailboat::update(const struct sitl_input &input)
                                     5.0f * Ys, 1.138f * roll_rate, 0.0924f * roll_rate * abs(roll_rate),  roll_rate * roll_rate * roll_rate * 0.000229f,roll_rate * 0.000229f);
 
                                     //roll_r * 0.000229f - roll_a * 13.823f - kf
-    AP::logger().WriteStreaming("SIM8", "TimeUS,roll6,roll7,roll_rate,roll_angle,t5",
+    AP::logger().WriteStreaming("SIM8", "TimeUS,windsim,windcha,dirsim,dircha,t5",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    roll_angle * 13.823f,Kk, roll_rate,roll_angle,0.56044*sway_rate * velocity_body.x/1.3);                                
+                                    float(wind_sim_speed),float(wind_change), float(wind_sim_direction),roll_angle,0.56044*sway_rate * velocity_body.x/1.3);                                
 }
 
 } // namespace SITL
