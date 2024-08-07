@@ -1,13 +1,17 @@
 --[[
    PI Controller used for testing the controller design of the rudder
 --]]
-UPDATE_RATE_HZ = 10
+
+
+
+
+
+UPDATE_RATE_HZ = 15
 
 -- select the servo powering the rudder
 local servo_function = Parameter()
 servo_function:init("SERVO1_FUNCTION")
 local servo_Original = 26
-local step_starte =0
 
 local K_rudder = 94
 
@@ -48,11 +52,18 @@ local function constrain(v, vmin, vmax)
    return v
 end
 
-
 local previous_heading = 0.0
 local current_heading = 0.0
 local previous_desired_heading = 0.0
 local desired_yaw = 0.0
+
+
+local function delay()
+   
+   return update, 250
+end
+
+
 
 -- MIN, MAX and IDLE PWM for throttle output
 STRCTL_PWM_MIN = bind_add_param('PWM_MIN', 2, 1000)
@@ -64,10 +75,7 @@ STRCTL_PID_P = bind_add_param('PID_P', 5, 0.67)
 STRCTL_PID_I = bind_add_param('PID_I', 6, 0.33)
 
 -- maximum I contribution
-STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 0.3)
-
--- RCn_OPTION value for 3 position switch
-STRCTL_RC_FUNC  = bind_add_param('RC_FUNC',  8, 300)
+STRCTL_PID_IMAX = bind_add_param('PID_IMAX', 7, 0.25)
 
 -- output servo channel that we will control
 STRCTL_THR_CHAN = bind_add_param('THR_CHAN', 9, 1)
@@ -87,7 +95,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     local _iMax = iMax
     local _min = min
     local _max = max
-    local _last_t = millis():tofloat() * 0.001
+    local _last_t = nil
     local _I = 0
     local _P = 0
     local _total = 0
@@ -133,7 +141,7 @@ local function PI_controller(kP,kI,iMax,min,max)
     -- log the controller internals
     function self.log(name)
        -- allow for an external addition to total
-       logger:write(name,'Targ,Curr,P,I,Total','fffff',_target,_current,_P,_I,_total)
+       logger.write(name,'Targ,Curr,P,I,Total','fffff',_target,_current,_P,_I,_total)
     end
  
     -- return the instance
@@ -143,31 +151,31 @@ local function PI_controller(kP,kI,iMax,min,max)
 
  local last_pwm = STRCTL_PWM_MIN:get()
  -- Find the desired heading angle
-local desired_heading = Parameter()
-if not desired_heading:init('PTHCTL_Heading') then
-  gcs:send_text(6, 'get PTHCTL_Heading failed')
-end
 
-local rudder_out = 0
-local STRCTL_ENABLE = 0
-local AUX_FUNCTION_NUM = 300
+ local rudder_out = 0
+ local STRCTL_ENABLE = 0
+ local AUX_FUNCTION_NUM = 300
+ local aux_changed = false
+ local x_h
+local start = false
 local rudder_pwm
-STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
 function set_servo()
    SRV_Channels:set_output_pwm(94,math.floor(rudder_pwm))
 end
 
 function update()
-   
+
    -- Initialize PI Controler Values to zero
    if rc:get_aux_cached(AUX_FUNCTION_NUM) == 2 then
-     -- gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
+      --gcs:send_text(MAV_SEVERITY_INFO,"STRCtl: run")
       STRCTL_ENABLE = 1
       -- Initialize PI Controller
-      servo_function:set(K_rudder)
-      if step_starte == 0 then
-         desired_yaw = ahrs:get_yaw() + math.pi/12
-         step_starte = 1
+      servo_function:set(K_rudder);
+      
+      if not start then
+         STR_PI = PI_controller(STRCTL_PID_P:get(), STRCTL_PID_I:get(), STRCTL_PID_IMAX:get(), -1, 1)
+         x_h = ahrs:get_yaw()+math.pi/6
+         start = true
       end
    else
       STRCTL_ENABLE = 0
@@ -186,13 +194,21 @@ function update()
       -- path following contrller or tacking controller
       --desired_yaw = desired_heading:get()
 
-      --desired_yaw = constrain(desired_yaw,-math.pi, math.pi)
+      -- Step response
+      desired_yaw = x_h
+
       -- Change current yaw from -pi - pi  to -2*pi - 2*pi
       if (previous_heading - current_heading) < -math.pi then
          current_heading = current_heading - 2 * math.pi
       elseif (previous_heading - current_heading) > math.pi then
          current_heading = current_heading + 2 * math.pi
       end
+       -- Change desired yaw from -pi - pi  to -2*pi - 2*pi
+      --if (previous_desired_heading - desired_yaw) < -math.pi then
+      --   desired_yaw = desired_yaw - 2 * math.pi
+      --elseif (previous_desired_heading - desired_yaw) > math.pi then
+      --   desired_yaw = desired_yaw + 2 * math.pi
+      --end
 
       previous_heading = current_heading
       rudder_out = STR_PI.update(desired_yaw, current_heading)
@@ -207,11 +223,9 @@ function update()
    
       rudder_pwm = constrain(rudder_pwm, last_pwm - max_change, last_pwm + max_change)
       last_pwm = rudder_pwm
-      logger:write("STRD",'DesYaw,Yaw,Rudder','fff',desired_yaw,current_heading,rudder_pwm)
-      
+      logger.write("STRD",'DesYaw,Yaw,PrevYaw,Rudder','ffff',desired_yaw,current_heading,previous_heading,rudder_pwm)
       if STRCTL_THR_CHAN:get() > 0 then
-         --SRV_Channels:set_output_pwm_chan(servo_number, math.floor(rudder_pwm))
-         local succes, err = pcall(set_servo)
+         pcall(set_servo)
       end
    end
 end
@@ -223,16 +237,17 @@ end
  function protected_wrapper()
    local success, err = pcall(update)
    if not success then
-      gcs:send_text(MAV_SEVERITY_EMERGENCY, "Internal Error: ")
       servo_function:set(servo_Original)
+      gcs:send_text(MAV_SEVERITY_EMERGENCY, "Internal Error: " .. err)
       -- when we fault we run the update function again after 1s, slowing it
       -- down a bit so we don't flood the console with errors
       return protected_wrapper, 1000
+      --return
    end
    return protected_wrapper, 1000/UPDATE_RATE_HZ
  end
  
- gcs:send_text(MAV_SEVERITY_INFO,"Loaded gen_control.lua")
+ gcs:send_text(MAV_SEVERITY_INFO,"Step Input Loaded.lua")
  
  -- start running update loop
  return protected_wrapper()

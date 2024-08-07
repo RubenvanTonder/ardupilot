@@ -48,6 +48,12 @@ local tack = Parameter('Nv_Tack')
    gcs:send_text(6, 'get PTHCTL_Heading failed')
  end
 
+ -- Get the data from onboard wind sensor
+local switch = Parameter()
+if not switch:init('Nv_Wind') then
+  gcs:send_text(6, 'get Nv_Wind failed')
+end
+
 -- constrain a value between limits
 local function constrain(v, vmin, vmax)
    if v < vmin then
@@ -161,16 +167,18 @@ local function update()
 
       vbx = vex * math.cos(yaw) + vey *math.sin(yaw)
       vby = -vex * math.sin(yaw) * math.cos(roll) + vey *math.cos(yaw) * math.cos(roll)
-      
+      U = math.sqrt(vbx*vbx + vby*vby)
       -- Check if vbx ~= 0 
       if (vbx>0.3) then
-         beta = math.asin(constrain(vby/vbx,-0.2,0.2))
+         beta = math.asin(constrain(vby/U,-0.4,0.4))
         -- beta=0
       else
          beta=0
       end
       
-
+      if switch:get() == 1 then
+         PTH_PI.reset(0)
+      end
       if tack:get() == 0 then
         x_r = constrain(math.atan(PTH_PI.update(e:get()),1), -0.5, 0.5)
         x_d = x_p:get() - x_r - beta

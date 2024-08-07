@@ -295,6 +295,8 @@ void Sailboat::update(const struct sitl_input &input)
         wind_change = dist(generator);
         wind_sim_direction = constrain_double(wind_sim_direction + 10*wind_change, 0.0, 360.0);
         counter = 0;
+        wind_sim_speed = 3.0;
+        wind_sim_direction = -90.0;
     }else {
         counter =counter +1;
     }
@@ -558,7 +560,7 @@ void Sailboat::update(const struct sitl_input &input)
     accel_body /= mass;
     
     // add in accel due to direction change
-    accel_body.y += yaw_rate * speed *1.2;
+    accel_body.y += yaw_rate * speed ;
 
     // now in earth frame
     // remove roll and pitch effects from waves
@@ -644,10 +646,10 @@ void Sailboat::update(const struct sitl_input &input)
                                     5.0f * Ys, 1.138f * roll_rate, 0.0924f * roll_rate * abs(roll_rate),  roll_rate * roll_rate * roll_rate * 0.000229f,roll_rate * 0.000229f);
 
                                     //roll_r * 0.000229f - roll_a * 13.823f - kf
-    AP::logger().WriteStreaming("SIM8", "TimeUS,windsim,windcha,dirsim,dircha,t5",
+    AP::logger().WriteStreaming("SIM8", "TimeUS,windsim,windcha,dirsim,app,t5",
                                     "Qfffff",
                                     AP_HAL::micros64(),
-                                    float(wind_sim_speed),float(wind_change), float(wind_sim_direction),roll_angle,0.56044*sway_rate * velocity_body.x/1.3);                                
+                                    float(wind_sim_speed),float(wind_change), float(wind_sim_direction),wind_apparent_ef,0.56044*sway_rate * velocity_body.x/1.3);                                
 }
 
 } // namespace SITL
